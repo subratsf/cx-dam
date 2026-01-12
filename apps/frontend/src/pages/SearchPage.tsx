@@ -89,7 +89,7 @@ export function SearchPage() {
     <div className="min-h-screen">
       {/* Google Drive-style header with search */}
       <div className={`${!hasSearched ? 'flex items-center justify-center min-h-[60vh]' : 'mb-8'}`}>
-        <div className="w-full max-w-3xl mx-auto px-4">
+        <div className="w-full max-w-4xl mx-auto">
           {!hasSearched && (
             <div className="text-center mb-8">
               <h1 className="text-5xl font-normal text-gray-700 mb-2">CX Asset Search</h1>
@@ -298,7 +298,7 @@ export function SearchPage() {
 
       {/* Results grid */}
       {hasSearched && !showDropdown && (
-        <div className="max-w-7xl mx-auto px-4">
+        <div className="w-full">
           {isLoading ? (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>

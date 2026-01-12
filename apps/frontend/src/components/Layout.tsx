@@ -1,14 +1,20 @@
-import { Outlet, Link } from 'react-router-dom';
+import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { authApi } from '../api/auth.api';
 import { useAuthStore } from '../stores/auth.store';
 import React, { useEffect, useState, useRef } from 'react';
 
 export function Layout() {
+  const location = useLocation();
   const { user, permissions, belongsToOrg, setAuth, clearAuth, hasCheckedAuth, markAuthChecked } = useAuthStore();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
+  const [showRepoPermissionsModal, setShowRepoPermissionsModal] = useState(false);
+  const [repoSearchQuery, setRepoSearchQuery] = useState('');
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const isSearchPage = location.pathname === '/';
+  const isUploadPage = location.pathname === '/upload';
 
   // Only check auth once if we don't have a user and haven't checked yet
   const shouldCheckAuth = !user && !hasCheckedAuth;
@@ -57,27 +63,89 @@ export function Layout() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+      <nav className="bg-white/80 backdrop-blur-md shadow-sm border-b border-gray-200/50 sticky top-0 z-40">
+        <div className="mx-auto px-4 sm:px-6">
           <div className="flex justify-between h-16">
-            <div className="flex">
-              <Link to="/" className="flex items-center">
-                <span className="text-2xl font-bold text-blue-600">CX DAM</span>
+            <div className="flex items-center space-x-8">
+              <Link to="/" className="flex items-center space-x-3 group">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-blue-600 rounded-lg blur opacity-25 group-hover:opacity-40 transition-opacity"></div>
+                  <div className="relative bg-gradient-to-br from-blue-600 to-blue-700 p-2 rounded-lg">
+                    <svg
+                      className="h-6 w-6 text-white"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                      />
+                    </svg>
+                  </div>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+                    CX DAM
+                  </span>
+                  <span className="text-[10px] text-gray-500 -mt-1">Digital Asset Manager</span>
+                </div>
               </Link>
-              <div className="ml-10 flex items-center space-x-4">
+
+              <div className="hidden md:flex items-center space-x-1">
                 <Link
                   to="/"
-                  className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
+                  className={`group flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    isSearchPage
+                      ? 'text-blue-600 bg-blue-50 shadow-sm'
+                      : 'text-gray-700 hover:text-blue-600 hover:bg-blue-50'
+                  }`}
                 >
-                  Search
+                  <svg
+                    className={`h-4 w-4 transition-colors ${
+                      isSearchPage ? 'text-blue-600' : 'text-gray-400 group-hover:text-blue-600'
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                  <span>Search</span>
                 </Link>
                 {user && (
                   <Link
                     to="/upload"
-                    className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
+                    className={`group flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      isUploadPage
+                        ? 'text-blue-600 bg-blue-50 shadow-sm'
+                        : 'text-gray-700 hover:text-blue-600 hover:bg-blue-50'
+                    }`}
                   >
-                    Upload
+                    <svg
+                      className={`h-4 w-4 transition-colors ${
+                        isUploadPage ? 'text-blue-600' : 'text-gray-400 group-hover:text-blue-600'
+                      }`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                      />
+                    </svg>
+                    <span>Upload</span>
                   </Link>
                 )}
               </div>
@@ -186,6 +254,23 @@ export function Layout() {
                         <span>View Profile</span>
                       </button>
 
+                      <button
+                        onClick={() => {
+                          setShowRepoPermissionsModal(true);
+                          setShowUserMenu(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                      >
+                        <svg
+                          className="h-4 w-4 text-gray-500"
+                          fill="currentColor"
+                          viewBox="0 0 16 16"
+                        >
+                          <path d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9zm10.5-1V9h-8c-.356 0-.694.074-1 .208V2.5a1 1 0 011-1h8zM5 12.25v3.25a.25.25 0 00.4.2l1.45-1.087a.25.25 0 01.3 0L8.6 15.7a.25.25 0 00.4-.2v-3.25a.25.25 0 00-.25-.25h-3.5a.25.25 0 00-.25.25z" />
+                        </svg>
+                        <span>Repository Permissions</span>
+                      </button>
+
                       <div className="border-t border-gray-200 mt-2 pt-2">
                         <button
                           onClick={handleLogout}
@@ -237,7 +322,10 @@ export function Layout() {
             {/* Background overlay */}
             <div
               className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
-              onClick={() => setShowUserModal(false)}
+              onClick={() => {
+                setShowUserModal(false);
+                setRepoSearchQuery('');
+              }}
             ></div>
 
             {/* Modal panel */}
@@ -312,36 +400,19 @@ export function Layout() {
                     </div>
                   </div>
 
-                  {/* Permissions */}
+                  {/* Quick Stats */}
                   {permissions.length > 0 && (
                     <div>
-                      <h5 className="text-sm font-medium text-gray-700 mb-2">
-                        Repository Permissions ({permissions.length})
-                      </h5>
-                      <div className="bg-gray-50 rounded-md p-3 max-h-48 overflow-y-auto space-y-2">
-                        {permissions.map((perm, idx) => (
-                          <div
-                            key={idx}
-                            className="flex justify-between items-center text-sm py-1"
-                          >
-                            <span className="text-gray-900 font-mono text-xs">
-                              {perm.repoFullName}
-                            </span>
-                            <span
-                              className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                perm.permission === 'admin'
-                                  ? 'bg-red-100 text-red-800'
-                                  : perm.permission === 'maintainer'
-                                  ? 'bg-purple-100 text-purple-800'
-                                  : perm.permission === 'write'
-                                  ? 'bg-blue-100 text-blue-800'
-                                  : 'bg-gray-100 text-gray-800'
-                              }`}
-                            >
-                              {perm.permission}
-                            </span>
-                          </div>
-                        ))}
+                      <h5 className="text-sm font-medium text-gray-700 mb-2">Access Summary</h5>
+                      <div className="bg-gray-50 rounded-md p-3 space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Total Repositories:</span>
+                          <span className="font-medium text-gray-900">{permissions.length}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Organization:</span>
+                          <span className="font-mono text-gray-900 text-xs">salesforcedocs</span>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -361,7 +432,216 @@ export function Layout() {
         </div>
       )}
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Repository Permissions Modal */}
+      {showRepoPermissionsModal && user && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            {/* Background overlay */}
+            <div
+              className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
+              onClick={() => {
+                setShowRepoPermissionsModal(false);
+                setRepoSearchQuery('');
+              }}
+            ></div>
+
+            {/* Modal panel - extra large width */}
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900">Repository Permissions</h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Your access to repositories in the salesforcedocs organization
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowRepoPermissionsModal(false);
+                      setRepoSearchQuery('');
+                    }}
+                    className="text-gray-400 hover:text-gray-500"
+                  >
+                    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Stats Bar */}
+                  <div className="grid grid-cols-4 gap-4">
+                    <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                      <p className="text-xs text-blue-600 font-medium uppercase mb-1">Total</p>
+                      <p className="text-2xl font-bold text-blue-900">{permissions.length}</p>
+                    </div>
+                    <div className="bg-red-50 rounded-lg p-4 border border-red-200">
+                      <p className="text-xs text-red-600 font-medium uppercase mb-1">Admin</p>
+                      <p className="text-2xl font-bold text-red-900">
+                        {permissions.filter(p => p.permission === 'admin').length}
+                      </p>
+                    </div>
+                    <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                      <p className="text-xs text-purple-600 font-medium uppercase mb-1">Maintainer</p>
+                      <p className="text-2xl font-bold text-purple-900">
+                        {permissions.filter(p => p.permission === 'maintainer').length}
+                      </p>
+                    </div>
+                    <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                      <p className="text-xs text-green-600 font-medium uppercase mb-1">Write</p>
+                      <p className="text-2xl font-bold text-green-900">
+                        {permissions.filter(p => p.permission === 'write').length}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Search bar */}
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                      <svg
+                        className="h-5 w-5 text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                        />
+                      </svg>
+                    </div>
+                    <input
+                      type="text"
+                      value={repoSearchQuery}
+                      onChange={(e) => setRepoSearchQuery(e.target.value)}
+                      placeholder="Search repositories by name..."
+                      className="w-full pl-12 pr-12 py-3 text-sm border-2 border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    {repoSearchQuery && (
+                      <button
+                        onClick={() => setRepoSearchQuery('')}
+                        className="absolute inset-y-0 right-4 flex items-center text-gray-400 hover:text-gray-600"
+                      >
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Results count */}
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-gray-600">
+                      Showing {permissions.filter(p => p.repoFullName.toLowerCase().includes(repoSearchQuery.toLowerCase())).length} of {permissions.length} repositories
+                    </p>
+                  </div>
+
+                  {/* Repository list */}
+                  <div className="border border-gray-200 rounded-lg max-h-96 overflow-y-auto">
+                    {permissions.length === 0 ? (
+                      <div className="text-center py-12 text-gray-500">
+                        <svg
+                          className="h-16 w-16 mx-auto mb-4 text-gray-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                          />
+                        </svg>
+                        <p className="text-lg font-medium mb-2">No Repository Access</p>
+                        <p className="text-sm">You don't have access to any repositories in the salesforcedocs organization.</p>
+                      </div>
+                    ) : permissions.filter(p => p.repoFullName.toLowerCase().includes(repoSearchQuery.toLowerCase())).length === 0 ? (
+                      <div className="text-center py-12 text-gray-500">
+                        <svg
+                          className="h-16 w-16 mx-auto mb-4 text-gray-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                          />
+                        </svg>
+                        <p className="text-lg font-medium mb-2">No Results Found</p>
+                        <p className="text-sm">No repositories match your search "{repoSearchQuery}"</p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-gray-200">
+                        {permissions
+                          .filter(p => p.repoFullName.toLowerCase().includes(repoSearchQuery.toLowerCase()))
+                          .map((perm, idx) => (
+                            <div
+                              key={idx}
+                              className="flex justify-between items-center p-4 hover:bg-gray-50 transition-colors"
+                            >
+                              <div className="flex items-center space-x-4 flex-1 min-w-0">
+                                <svg
+                                  className="h-6 w-6 text-gray-400 flex-shrink-0"
+                                  fill="currentColor"
+                                  viewBox="0 0 16 16"
+                                >
+                                  <path d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9zm10.5-1V9h-8c-.356 0-.694.074-1 .208V2.5a1 1 0 011-1h8zM5 12.25v3.25a.25.25 0 00.4.2l1.45-1.087a.25.25 0 01.3 0L8.6 15.7a.25.25 0 00.4-.2v-3.25a.25.25 0 00-.25-.25h-3.5a.25.25 0 00-.25.25z" />
+                                </svg>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-900 truncate">
+                                    {perm.repoFullName}
+                                  </p>
+                                </div>
+                              </div>
+                              <span
+                                className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase flex-shrink-0 ml-4 ${
+                                  perm.permission === 'admin'
+                                    ? 'bg-red-100 text-red-800'
+                                    : perm.permission === 'maintainer'
+                                    ? 'bg-purple-100 text-purple-800'
+                                    : perm.permission === 'write'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : 'bg-gray-100 text-gray-800'
+                                }`}
+                              >
+                                {perm.permission}
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  onClick={() => {
+                    setShowRepoPermissionsModal(false);
+                    setRepoSearchQuery('');
+                  }}
+                  className="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <main className="mx-auto px-4 sm:px-6 py-8">
         <Outlet />
       </main>
     </div>

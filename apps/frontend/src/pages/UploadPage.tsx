@@ -152,14 +152,60 @@ export function UploadPage() {
   if (uploadableRepos.length === 0) {
     return (
       <div className="max-w-4xl mx-auto">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-yellow-800 mb-2">
-            No Upload Permissions
-          </h2>
-          <p className="text-yellow-700">
-            You need write access to at least one repository in the salesforcedocs
-            organization to upload assets.
-          </p>
+        <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-xl p-8 shadow-lg">
+          <div className="flex items-start space-x-4">
+            <div className="flex-shrink-0">
+              <div className="flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100">
+                <svg
+                  className="h-6 w-6 text-yellow-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+              </div>
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xl font-semibold text-yellow-900 mb-3">
+                No Upload Permissions
+              </h2>
+              <div className="space-y-3 text-yellow-800">
+                <p>
+                  You need <span className="font-semibold">write access</span> or higher to at
+                  least one repository in the{' '}
+                  <span className="font-mono bg-yellow-100 px-2 py-0.5 rounded">
+                    salesforcedocs
+                  </span>{' '}
+                  organization to upload assets.
+                </p>
+                <div className="bg-white/60 rounded-lg p-4 mt-4">
+                  <p className="font-medium text-yellow-900 mb-2">Required permissions:</p>
+                  <ul className="list-disc list-inside space-y-1 text-sm">
+                    <li>
+                      <span className="font-semibold">Write</span> - Can upload new assets
+                    </li>
+                    <li>
+                      <span className="font-semibold">Maintain</span> - Can upload and replace
+                      assets
+                    </li>
+                    <li>
+                      <span className="font-semibold">Admin</span> - Full access
+                    </li>
+                  </ul>
+                </div>
+                <p className="text-sm mt-4">
+                  💡 <span className="font-medium">Need access?</span> Contact your GitHub
+                  organization administrator to request write permissions to a repository.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -171,7 +217,7 @@ export function UploadPage() {
   const errorCount = files.filter((f) => f.status === 'error').length;
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="w-full max-w-6xl mx-auto">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-normal text-gray-700">Upload files</h1>

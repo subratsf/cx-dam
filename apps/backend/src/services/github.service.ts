@@ -90,38 +90,81 @@ export class GitHubService {
   async getUserRepoPermissions(username: string): Promise<GitHubRepoPermission[]> {
     try {
       const permissions: GitHubRepoPermission[] = [];
+      let page = 1;
+      const perPage = 100;
 
-      // Get all repos the user has access to in the org
-      const { data: repos } = await this.octokit.repos.listForOrg({
-        org: config.GITHUB_ORG,
-        per_page: 100,
-      });
+      // Get all repos the authenticated user has access to
+      while (true) {
+        const { data: repos } = await this.octokit.repos.listForAuthenticatedUser({
+          per_page: perPage,
+          page,
+          affiliation: 'organization_member,collaborator',
+          visibility: 'all',
+        });
 
-      // Check permission for each repo
-      for (const repo of repos) {
-        try {
-          const { data: collab } = await this.octokit.repos.getCollaboratorPermissionLevel({
-            owner: config.GITHUB_ORG,
-            repo: repo.name,
-            username,
-          });
+        if (repos.length === 0) break;
 
-          const permission = this.mapGitHubPermission(collab.permission);
-          permissions.push({
-            repoFullName: repo.full_name,
-            permission,
-          });
-        } catch (error) {
-          // User might not have access to this repo, skip it
-          logger.debug('Skipping repo permission check', { repo: repo.name, error });
+        // Filter for the specific organization and get permissions
+        for (const repo of repos) {
+          // Only include repos from our target organization
+          if (repo.owner.login.toLowerCase() === config.GITHUB_ORG.toLowerCase()) {
+            try {
+              // Get detailed permission level
+              const { data: collab } = await this.octokit.repos.getCollaboratorPermissionLevel({
+                owner: config.GITHUB_ORG,
+                repo: repo.name,
+                username,
+              });
+
+              const permission = this.mapGitHubPermission(collab.permission);
+              permissions.push({
+                repoFullName: repo.full_name,
+                permission,
+              });
+            } catch (error) {
+              // If we can't get permission details, use the repo.permissions object
+              const permission = this.inferPermissionFromRepo(repo);
+              if (permission) {
+                permissions.push({
+                  repoFullName: repo.full_name,
+                  permission,
+                });
+              }
+              logger.debug('Using inferred permission for repo', { repo: repo.name });
+            }
+          }
         }
+
+        // If we got fewer than perPage results, we're done
+        if (repos.length < perPage) break;
+        page++;
       }
 
+      logger.info(`Found ${permissions.length} repositories for user ${username} in org ${config.GITHUB_ORG}`);
       return permissions;
     } catch (error) {
       logger.error('Failed to get user repo permissions', { error });
       throw error;
     }
+  }
+
+  /**
+   * Infer permission level from repository object
+   */
+  private inferPermissionFromRepo(repo: any): PermissionLevel | null {
+    if (!repo.permissions) return null;
+
+    if (repo.permissions.admin) {
+      return PermissionLevel.ADMIN;
+    } else if (repo.permissions.maintain) {
+      return PermissionLevel.MAINTAINER;
+    } else if (repo.permissions.push) {
+      return PermissionLevel.CONTRIBUTOR;
+    } else if (repo.permissions.pull) {
+      return PermissionLevel.VIEWER;
+    }
+
+    return null;
   }
 
   /**
