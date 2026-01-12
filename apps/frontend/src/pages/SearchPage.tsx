@@ -24,11 +24,15 @@ export function SearchPage() {
       if (searchQuery.trim()) {
         setShowDropdown(true);
         setHasSearched(true);
+      } else if (!workspace && !fileType && !tags) {
+        // Reset to landing page if search is cleared and no filters are active
+        setHasSearched(false);
+        setShowDropdown(false);
       }
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, workspace, fileType, tags]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -43,9 +47,9 @@ export function SearchPage() {
   }, []);
 
   // Only fetch when we have a search query or filters applied
-  const shouldFetch = hasSearched && (debouncedQuery.trim() || workspace || fileType || tags);
+  const shouldFetch = hasSearched && (!!debouncedQuery.trim() || !!workspace || !!fileType || !!tags);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ['assets', 'search', debouncedQuery, workspace, fileType, tags, page],
     queryFn: () =>
       assetApi.search({
@@ -57,6 +61,7 @@ export function SearchPage() {
         limit: 20,
       }),
     enabled: shouldFetch,
+    retry: false,
   });
 
   const handleSearch = (e: React.FormEvent) => {
@@ -71,6 +76,11 @@ export function SearchPage() {
     setFileType('');
     setTags('');
     setPage(1);
+    // If search is also empty, reset to landing page
+    if (!searchQuery.trim()) {
+      setHasSearched(false);
+      setShowDropdown(false);
+    }
   };
 
   const activeFiltersCount = [workspace, fileType, tags].filter(Boolean).length;
@@ -82,8 +92,8 @@ export function SearchPage() {
         <div className="w-full max-w-3xl mx-auto px-4">
           {!hasSearched && (
             <div className="text-center mb-8">
-              <h1 className="text-5xl font-normal text-gray-700 mb-2">Asset Search</h1>
-              <p className="text-gray-500">Search across all your digital assets</p>
+              <h1 className="text-5xl font-normal text-gray-700 mb-2">CX Asset Search</h1>
+              <p className="text-gray-500">Search across all CX digital assets</p>
             </div>
           )}
 
@@ -292,8 +302,35 @@ export function SearchPage() {
           {isLoading ? (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="mt-4 text-gray-600">Searching...</p>
             </div>
-          ) : data?.data.length === 0 ? (
+          ) : isError ? (
+            <div className="bg-red-50 border border-red-200 rounded-lg shadow-md p-12 text-center">
+              <svg
+                className="h-16 w-16 text-red-400 mx-auto mb-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <p className="text-red-800 text-lg font-medium mb-2">Error loading assets</p>
+              <p className="text-red-600 text-sm">
+                {error instanceof Error ? error.message : 'An unexpected error occurred. Please try again later.'}
+              </p>
+              <button
+                onClick={() => window.location.reload()}
+                className="mt-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+              >
+                Refresh Page
+              </button>
+            </div>
+          ) : !data || data.data.length === 0 ? (
             <div className="bg-white rounded-lg shadow-md p-12 text-center">
               <svg
                 className="h-16 w-16 text-gray-400 mx-auto mb-4"
@@ -308,8 +345,8 @@ export function SearchPage() {
                   d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
-              <p className="text-gray-600 text-lg">No assets found</p>
-              <p className="text-gray-500 text-sm mt-2">Try adjusting your search or filters</p>
+              <p className="text-gray-600 text-lg font-medium mb-2">No assets found</p>
+              <p className="text-gray-500 text-sm">Try adjusting your search or filters</p>
             </div>
           ) : (
             <>

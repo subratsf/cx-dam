@@ -81,10 +81,10 @@ router.get('/github/callback', async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
-    res.redirect(`${config.FRONTEND_URL}?auth=success`);
+    res.redirect(`${config.FRONTEND_URL}/auth/callback?auth=success`);
   } catch (error) {
     logger.error('GitHub OAuth callback failed', { error });
-    res.redirect(`${config.FRONTEND_URL}?auth=failed`);
+    res.redirect(`${config.FRONTEND_URL}/auth/callback?auth=failed`);
   }
 });
 
