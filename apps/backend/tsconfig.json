@@ -4,13 +4,13 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "module": "commonjs",
-    "target": "ES2022"
+    "target": "ES2022",
+    "baseUrl": ".",
+    "paths": {
+      "@cx-dam/shared": ["../../packages/shared/dist/index.d.ts"],
+      "@cx-dam/shared/*": ["../../packages/shared/dist/*"]
+    }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"],
-  "references": [
-    {
-      "path": "../../packages/shared"
-    }
-  ]
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

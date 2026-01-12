@@ -57,6 +57,7 @@ router.post(
       // Create asset record in database
       const asset = await assetRepository.create({
         ...input,
+        tags: input.tags || [],
         s3Key,
         uploadedBy: req.user!.user.id,
       });
@@ -191,7 +192,11 @@ router.get('/search', optionalAuth, async (req, res, next) => {
   try {
     const query = validateSchema(SearchAssetsQuerySchema, req.query);
 
-    const result = await assetRepository.search(query);
+    const result = await assetRepository.search({
+      ...query,
+      page: query.page ?? 1,
+      limit: query.limit ?? 20,
+    });
 
     // Generate download URLs for assets
     const assetsWithUrls = await Promise.all(
@@ -254,7 +259,7 @@ router.delete('/:id', authenticateToken, async (req: AuthRequest, res, next) => 
     }
 
     // Check if user owns the asset or has maintainer+ permission
-    const isOwner = asset.uploaded_by === req.user!.user.id;
+    const isOwner = asset.uploadedBy === req.user!.user.id;
     const hasMaintainerAccess = req.user!.permissions.some(
       (p) =>
         p.repoFullName === asset.workspace &&

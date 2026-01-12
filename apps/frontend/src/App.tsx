@@ -14,8 +14,8 @@ function App() {
       <Routes>
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/" element={<Layout />}>
-          <Route index element={<HomePage />} />
-          <Route path="search" element={<SearchPage />} />
+          <Route index element={<SearchPage />} />
+          <Route path="about" element={<HomePage />} />
           <Route
             path="upload"
             element={user ? <UploadPage /> : <Navigate to="/" replace />}

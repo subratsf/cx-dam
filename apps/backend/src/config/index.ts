@@ -1,7 +1,14 @@
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { z } from 'zod';
 
-dotenv.config();
+// Load .env from monorepo root
+// Traverse up from backend/src to reach the monorepo root
+const configPath = path.resolve(process.cwd(), '.env');
+dotenv.config({ path: configPath });
+
+console.log('Loading .env from:', configPath);
 
 const ConfigSchema = z.object({
   // Server
@@ -34,15 +41,23 @@ export type Config = z.infer<typeof ConfigSchema>;
 
 function loadConfig(): Config {
   try {
+    console.log('Loading configuration...');
+    console.log('Environment variables present:', Object.keys(process.env).filter(k =>
+      ['DATABASE_URL', 'GITHUB_CLIENT_ID', 'AWS_ACCESS_KEY_ID', 'JWT_SECRET', 'API_BASE_URL', 'FRONTEND_URL'].includes(k)
+    ));
     return ConfigSchema.parse(process.env);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      console.error('Configuration validation failed:');
+      console.error('\n❌ Configuration validation failed:');
       error.errors.forEach((err) => {
-        console.error(`  - ${err.path.join('.')}: ${err.message}`);
+        const field = err.path.join('.');
+        const value = process.env[field as string];
+        console.error(`  - ${field}: ${err.message}`);
+        console.error(`    Current value: ${value ? (value.length > 50 ? value.substring(0, 50) + '...' : value) : 'undefined'}`);
       });
+      console.error('');
     }
-    throw new Error('Invalid configuration');
+    throw new Error('Invalid configuration - see errors above');
   }
 }
 

@@ -7,12 +7,14 @@ interface AuthState {
   permissions: GitHubRepoPermission[];
   belongsToOrg: boolean;
   isAuthenticated: boolean;
+  hasCheckedAuth: boolean;
   setAuth: (
     user: User,
     permissions: GitHubRepoPermission[],
     belongsToOrg: boolean
   ) => void;
   clearAuth: () => void;
+  markAuthChecked: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -22,10 +24,12 @@ export const useAuthStore = create<AuthState>()(
       permissions: [],
       belongsToOrg: false,
       isAuthenticated: false,
+      hasCheckedAuth: false,
       setAuth: (user, permissions, belongsToOrg) =>
-        set({ user, permissions, belongsToOrg, isAuthenticated: true }),
+        set({ user, permissions, belongsToOrg, isAuthenticated: true, hasCheckedAuth: true }),
       clearAuth: () =>
-        set({ user: null, permissions: [], belongsToOrg: false, isAuthenticated: false }),
+        set({ user: null, permissions: [], belongsToOrg: false, isAuthenticated: false, hasCheckedAuth: false }),
+      markAuthChecked: () => set({ hasCheckedAuth: true }),
     }),
     {
       name: 'cx-dam-auth',

@@ -2,16 +2,23 @@ import { Outlet, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { authApi } from '../api/auth.api';
 import { useAuthStore } from '../stores/auth.store';
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 
 export function Layout() {
-  const { user, setAuth, clearAuth } = useAuthStore();
+  const { user, setAuth, clearAuth, hasCheckedAuth, markAuthChecked } = useAuthStore();
 
-  const { data: session } = useQuery({
+  // Only check auth once if we don't have a user and haven't checked yet
+  const shouldCheckAuth = !user && !hasCheckedAuth;
+
+  const { data: session, isError, isSuccess } = useQuery({
     queryKey: ['auth', 'me'],
     queryFn: authApi.getMe,
     retry: false,
-    enabled: !user,
+    enabled: shouldCheckAuth,
+    staleTime: Infinity,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
   });
 
   useEffect(() => {
@@ -20,9 +27,17 @@ export function Layout() {
     }
   }, [session, setAuth]);
 
+  // Mark as checked even on error to prevent infinite retries
+  useEffect(() => {
+    if ((isError || isSuccess) && !hasCheckedAuth) {
+      markAuthChecked();
+    }
+  }, [isError, isSuccess, hasCheckedAuth, markAuthChecked]);
+
   const handleLogout = async () => {
     await authApi.logout();
     clearAuth();
+    window.location.href = '/';
   };
 
   return (
@@ -36,10 +51,10 @@ export function Layout() {
               </Link>
               <div className="ml-10 flex items-center space-x-4">
                 <Link
-                  to="/search"
+                  to="/"
                   className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
                 >
-                  Search Assets
+                  Search
                 </Link>
                 {user && (
                   <Link

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { UserSession } from '@cx-dam/shared';
 import { config } from '../config';
 import { logger } from '../utils/logger';
@@ -64,8 +64,8 @@ router.get('/github/callback', async (req, res) => {
 
     // Generate JWT
     const token = jwt.sign(session, config.JWT_SECRET, {
-      expiresIn: config.JWT_EXPIRY,
-    });
+      expiresIn: config.JWT_EXPIRY as string | number,
+    } as SignOptions);
 
     logger.info('User authenticated successfully', {
       userId: user.id,

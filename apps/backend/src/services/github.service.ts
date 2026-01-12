@@ -30,9 +30,11 @@ export class GitHubService {
         }),
       });
 
-      const data = await response.json();
+      const data = (await response.json()) as
+        | { error: string; error_description: string }
+        | { access_token: string };
 
-      if (data.error) {
+      if ('error' in data) {
         throw new Error(`GitHub OAuth error: ${data.error_description}`);
       }
 

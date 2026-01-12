@@ -70,7 +70,7 @@ export class BloomFilterService {
       const { bit_array, size, hash_count } = result.rows[0];
 
       // Convert PostgreSQL bytea to number array
-      const bitArray = Array.from(bit_array);
+      const bitArray = Array.from(new Uint8Array(bit_array as Buffer)) as number[];
 
       return BloomFilter.import({
         bitArray,

@@ -2,9 +2,10 @@
   "name": "@cx-dam/frontend",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "type-check": "tsc --noEmit",

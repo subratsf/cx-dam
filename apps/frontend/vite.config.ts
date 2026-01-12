@@ -7,6 +7,18 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@cx-dam/shared': path.resolve(__dirname, '../../packages/shared/src/index.ts'),
+    },
+  },
+  optimizeDeps: {
+    include: ['@cx-dam/shared'],
+    esbuildOptions: {
+      target: 'es2020',
+    },
+  },
+  build: {
+    commonjsOptions: {
+      include: [/@cx-dam\/shared/, /node_modules/],
     },
   },
   server: {

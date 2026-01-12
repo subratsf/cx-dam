@@ -12,10 +12,13 @@ export function AuthCallback() {
   const authStatus = searchParams.get('auth');
 
   const { data: session, isLoading } = useQuery({
-    queryKey: ['auth', 'me'],
+    queryKey: ['auth', 'callback'],
     queryFn: authApi.getMe,
     enabled: authStatus === 'success',
     retry: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
   });
 
   useEffect(() => {

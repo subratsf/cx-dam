@@ -74,7 +74,7 @@ cx-dam/
 ### 1. Clone the Repository
 
 ```bash
-git clone <repository-url>
+git clone git@github.com:sfdocs/cx-dam.git
 cd cx-dam
 ```
 
@@ -170,6 +170,35 @@ FRONTEND_URL=http://localhost:3000
 # Environment
 NODE_ENV=development
 ```
+
+# Step-by-Step Guide for local Development
+
+## Github Oauth App
+
+  1. Go to GitHub Settings
+
+  1. Log into GitHub
+  2. Click your profile picture (top right) → Settings
+  3. Scroll down to Developer settings (bottom of left sidebar)
+  4. Click OAuth Apps
+  5. Click New OAuth App button
+
+  2. Fill in Application Details
+
+  Application name: CX DAM Local Development
+  Homepage URL: http://localhost:3000
+  Application description: Digital Asset Management - Local Dev (optional)
+  Authorization callback URL: http://localhost:3001/api/auth/github/callback
+
+  Important:
+  - The callback URL must match exactly: http://localhost:3001/api/auth/github/callback
+  - Port 3001 is where your backend runs
+  - Don't add trailing slash
+
+## Postgraes URL
+- Copy `DATABASE_URL` config from https://dashboard.heroku.com/apps/cx-dam/settings
+
+## S3 URL details
 
 ### 7. Run Database Migrations
 
@@ -483,9 +512,6 @@ CREATE TABLE assets (
 ## 📝 TODOs
 
 ### High Priority
-- [ ] Add comprehensive unit tests for services and repositories
-- [ ] Add integration tests for API endpoints
-- [ ] Add E2E tests with Playwright
 - [ ] Implement rate limiting on API endpoints
 - [ ] Add Redis caching for frequent queries
 - [ ] Implement asset preview thumbnails
@@ -494,16 +520,12 @@ CREATE TABLE assets (
 - [ ] Add bulk upload functionality
 - [ ] Implement asset versioning
 - [ ] Add audit logs for all operations
-- [ ] Create admin dashboard
 - [ ] Add asset usage analytics
 - [ ] Implement asset tagging suggestions
 
 ### Low Priority
 - [ ] Add asset metadata extraction (EXIF, etc.)
 - [ ] Implement CDN integration
-- [ ] Add webhook support for external integrations
-- [ ] Create CLI tool for bulk operations
-- [ ] Add multi-language support
 
 ## 📄 License
 

@@ -1,4 +1,4 @@
-import { Pool, PoolClient, QueryResult } from 'pg';
+import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 
@@ -11,6 +11,9 @@ class DatabaseClient {
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
+      ssl: config.NODE_ENV === 'production' || config.DATABASE_URL.includes('amazonaws.com') || config.DATABASE_URL.includes('heroku')
+        ? { rejectUnauthorized: false }
+        : false,
     });
 
     this.pool.on('error', (err) => {
@@ -18,7 +21,7 @@ class DatabaseClient {
     });
   }
 
-  async query<T = any>(text: string, params?: any[]): Promise<QueryResult<T>> {
+  async query<T extends QueryResultRow = any>(text: string, params?: any[]): Promise<QueryResult<T>> {
     const start = Date.now();
     try {
       const result = await this.pool.query<T>(text, params);

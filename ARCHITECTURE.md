@@ -459,3 +459,63 @@ Future additions:
 - Distributed tracing
 - Performance monitoring
 - Alert systems
+
+  📦 Project Structure
+
+  cx-dam/
+  ├── apps/
+  │   ├── backend/          # Node.js + Express API (20 files)
+  │   └── frontend/         # React + Vite app (19 files)
+  ├── packages/
+  │   └── shared/           # Shared types & utilities (9 files)
+  ├── README.md             # Complete setup guide
+  ├── ARCHITECTURE.md       # Detailed architecture documentation
+  ├── DEPLOYMENT.md         # Production deployment guide
+  ├── CONTRIBUTING.md       # Contribution guidelines
+  ├── .env.example          # Environment template
+  ├── package.json          # Monorepo configuration
+  ├── turbo.json           # Turborepo setup
+  └── tsconfig.json        # TypeScript config
+
+  ✅ What's Included
+
+  Backend (apps/backend/)
+
+  - Complete Express API with TypeScript
+  - GitHub OAuth integration (auth flow in routes/auth.routes.ts:17-119)
+  - S3 presigned URLs for upload/download (services/s3.service.ts:26-99)
+  - Bloom Filter implementation for name uniqueness (services/bloom-filter.service.ts:12-156)
+  - PostgreSQL integration with connection pooling (db/client.ts:7-60)
+  - Full database schema (db/schema.sql:1-95)
+  - Permission middleware enforcing GitHub-based auth (middleware/permission.middleware.ts:9-87)
+  - Asset management APIs (routes/asset.routes.ts:17-239)
+  - Structured logging with Winston
+  - Security with Helmet, CORS, JWT
+
+  Frontend (apps/frontend/)
+
+  - React 18 with TypeScript and Vite
+  - TanStack Query for data fetching
+  - Zustand for state management
+  - Tailwind CSS for styling
+  - Complete pages:
+    - Home page with features
+    - Search with pagination (pages/SearchPage.tsx:7-119)
+    - Upload with repo selector (pages/UploadPage.tsx:12-163)
+    - Auth callback handler
+  - Layout with GitHub login (components/Layout.tsx:7-66)
+
+  Shared Package (packages/shared/)
+
+  - Zod schemas for validation
+  - TypeScript types for User, Asset, API responses
+  - Bloom Filter class with persistence
+  - Permission utilities (canUploadAsset, canReplaceAsset)
+  - Validation helpers
+
+  Documentation
+
+  - README.md: Complete setup instructions, API docs, architecture overview
+  - ARCHITECTURE.md: Detailed system design, data flows, security model
+  - DEPLOYMENT.md: Production deployment guides (AWS, Heroku, Vercel)
+  - CONTRIBUTING.md: Development guidelines and workflow
