@@ -19,7 +19,19 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
       ? authHeader.substring(7)
       : req.cookies?.token;
 
+    logger.debug('Auth middleware check', {
+      path: req.path,
+      hasCookies: !!req.cookies,
+      cookieKeys: Object.keys(req.cookies || {}),
+      hasToken: !!token,
+      hasAuthHeader: !!authHeader,
+    });
+
     if (!token) {
+      logger.warn('No authentication token found', {
+        path: req.path,
+        cookies: req.cookies,
+      });
       return res.status(401).json({
         success: false,
         error: {

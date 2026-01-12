@@ -2,8 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { assetApi } from '../api/asset.api';
 import { AssetType } from '@cx-dam/shared';
+import { useAuthStore } from '../stores/auth.store';
 
 export function SearchPage() {
+  const { permissions } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
@@ -13,9 +15,20 @@ export function SearchPage() {
 
   // Filter states
   const [workspace, setWorkspace] = useState('');
+  const [workspaceSearch, setWorkspaceSearch] = useState('');
+  const [showWorkspaceDropdown, setShowWorkspaceDropdown] = useState(false);
   const [fileType, setFileType] = useState<AssetType | ''>('');
   const [tags, setTags] = useState('');
   const [page, setPage] = useState(1);
+  const workspaceDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Get all unique repositories from permissions
+  const availableRepos = permissions.map((p) => p.repoFullName).sort();
+
+  // Filter repos based on search
+  const filteredWorkspaces = availableRepos.filter((repo) =>
+    repo.toLowerCase().includes(workspaceSearch.toLowerCase())
+  );
 
   // Debounce search input
   useEffect(() => {
@@ -39,6 +52,9 @@ export function SearchPage() {
     function handleClickOutside(event: MouseEvent) {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
         setShowDropdown(false);
+      }
+      if (workspaceDropdownRef.current && !workspaceDropdownRef.current.contains(event.target as Node)) {
+        setShowWorkspaceDropdown(false);
       }
     }
 
@@ -73,6 +89,7 @@ export function SearchPage() {
 
   const handleClearFilters = () => {
     setWorkspace('');
+    setWorkspaceSearch('');
     setFileType('');
     setTags('');
     setPage(1);
@@ -83,19 +100,28 @@ export function SearchPage() {
     }
   };
 
+  const handleWorkspaceSelect = (repoFullName: string) => {
+    setWorkspace(repoFullName);
+    setWorkspaceSearch(repoFullName);
+    setShowWorkspaceDropdown(false);
+    setPage(1);
+  };
+
   const activeFiltersCount = [workspace, fileType, tags].filter(Boolean).length;
 
   return (
-    <div className="min-h-screen">
+    <div className="h-[calc(100vh-80px)] overflow-hidden flex flex-col">
       {/* Google Drive-style header with search */}
-      <div className={`${!hasSearched ? 'flex items-center justify-center min-h-[60vh]' : 'mb-8'}`}>
+      <div className={`flex-shrink-0 transition-all duration-500 ease-in-out ${
+        !hasSearched ? 'flex items-center justify-center min-h-[50vh]' : 'mb-6'
+      }`}>
         <div className="w-full max-w-4xl mx-auto">
-          {!hasSearched && (
-            <div className="text-center mb-8">
-              <h1 className="text-5xl font-normal text-gray-700 mb-2">CX Asset Search</h1>
-              <p className="text-gray-500">Search across all CX digital assets</p>
-            </div>
-          )}
+          <div className={`text-center mb-8 transition-all duration-500 ease-in-out ${
+            !hasSearched ? 'opacity-100 max-h-32' : 'opacity-0 max-h-0 mb-0 overflow-hidden'
+          }`}>
+            <h1 className="text-5xl font-normal text-gray-700 mb-2">CX Asset Search</h1>
+            <p className="text-gray-500">Search across all CX digital assets</p>
+          </div>
 
           {/* Search bar - fixed position when searching */}
           <div ref={searchRef} className="relative">
@@ -225,9 +251,13 @@ export function SearchPage() {
 
           {/* Filters panel - expands below with smooth animation */}
           <div
-            className={`overflow-hidden transition-all duration-300 ease-in-out ${
-              showFilters ? 'max-h-96 opacity-100 mt-4' : 'max-h-0 opacity-0'
+            className={`transition-all duration-300 ease-in-out ${
+              showFilters ? 'opacity-100 mt-4' : 'max-h-0 opacity-0'
             }`}
+            style={{
+              overflow: showFilters ? 'visible' : 'hidden',
+              maxHeight: showFilters ? '500px' : '0'
+            }}
           >
             <div className="p-6 bg-white rounded-lg shadow-lg border border-gray-200">
               <div className="flex items-center justify-between mb-4">
@@ -242,20 +272,83 @@ export function SearchPage() {
                 )}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
+                <div ref={workspaceDropdownRef} className="relative">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Workspace
                   </label>
-                  <input
-                    type="text"
-                    value={workspace}
-                    onChange={(e) => {
-                      setWorkspace(e.target.value);
-                      setPage(1);
-                    }}
-                    placeholder="e.g., salesforcedocs/docs"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={workspaceSearch}
+                      onChange={(e) => {
+                        setWorkspaceSearch(e.target.value);
+                        setShowWorkspaceDropdown(true);
+                        if (!e.target.value) {
+                          setWorkspace('');
+                        }
+                      }}
+                      onFocus={() => setShowWorkspaceDropdown(true)}
+                      placeholder="Search repositories..."
+                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                      <svg
+                        className="h-5 w-5 text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* Dropdown list */}
+                  {showWorkspaceDropdown && filteredWorkspaces.length > 0 && (
+                    <div className="absolute z-20 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                      {filteredWorkspaces.map((repo) => (
+                        <button
+                          key={repo}
+                          type="button"
+                          onClick={() => handleWorkspaceSelect(repo)}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 transition-colors ${
+                            workspace === repo
+                              ? 'bg-blue-100 text-blue-900 font-medium'
+                              : 'text-gray-900'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="truncate">{repo}</span>
+                            {workspace === repo && (
+                              <svg
+                                className="h-5 w-5 text-blue-600 flex-shrink-0 ml-2"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* No results message */}
+                  {showWorkspaceDropdown && workspaceSearch && filteredWorkspaces.length === 0 && (
+                    <div className="absolute z-20 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg p-3 text-center text-gray-500 text-sm">
+                      No repositories found
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -298,7 +391,7 @@ export function SearchPage() {
 
       {/* Results grid */}
       {hasSearched && !showDropdown && (
-        <div className="w-full">
+        <div className="flex-1 overflow-y-auto w-full">
           {isLoading ? (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>

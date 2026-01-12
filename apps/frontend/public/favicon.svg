@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Background with rounded corners -->
+  <rect width="32" height="32" rx="6" fill="#2563eb"/>
+
+  <!-- Archive box - main body (white) -->
+  <rect x="7" y="14" width="18" height="11" rx="1" fill="#ffffff"/>
+
+  <!-- Archive box - middle section (light blue) -->
+  <rect x="7" y="11" width="18" height="3" fill="#93c5fd"/>
+
+  <!-- Archive box - top section (lighter blue) -->
+  <rect x="9" y="8" width="14" height="3" fill="#dbeafe"/>
+
+  <!-- Box outline for depth -->
+  <rect x="7" y="14" width="18" height="11" rx="1" stroke="#1e40af" stroke-width="0.8" fill="none"/>
+  <rect x="7" y="11" width="18" height="3" stroke="#3b82f6" stroke-width="0.6" fill="none"/>
+
+  <!-- Handle cutout on top -->
+  <rect x="13" y="16" width="6" height="1.5" rx="0.5" fill="#2563eb"/>
+</svg>

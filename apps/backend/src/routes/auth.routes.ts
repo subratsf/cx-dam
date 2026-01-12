@@ -6,6 +6,7 @@ import { logger } from '../utils/logger';
 import { GitHubService } from '../services/github.service';
 import { userRepository } from '../repositories/user.repository';
 import { AuthRequest, authenticateToken } from '../middleware/auth.middleware';
+import { repoPermissionCache } from '../services/repo-cache.service';
 
 const router = Router();
 
@@ -48,8 +49,38 @@ router.get('/github/callback', async (req, res) => {
     // Check org membership
     const belongsToOrg = await authenticatedGithubService.checkOrgMembership(githubUser.login);
 
-    // Get repository permissions
-    const permissions = await authenticatedGithubService.getUserRepoPermissions(githubUser.login);
+    // Get repository permissions from cache or fetch synchronously
+    let permissions = repoPermissionCache.get(githubUser.login);
+
+    if (!permissions) {
+      logger.info('⏳ Fetching repository permissions synchronously...', { username: githubUser.login });
+
+      try {
+        // Fetch synchronously to ensure we have data before login completes
+        permissions = await authenticatedGithubService.getUserRepoPermissions(githubUser.login);
+
+        // Cache the results
+        repoPermissionCache.set(githubUser.login, permissions);
+
+        logger.info('✅ Repository permissions fetched successfully', {
+          username: githubUser.login,
+          repoCount: permissions.length
+        });
+      } catch (error) {
+        logger.error('❌ Failed to fetch repository permissions', {
+          username: githubUser.login,
+          error: error instanceof Error ? error.message : String(error)
+        });
+
+        // Return empty array on error
+        permissions = [];
+      }
+    } else {
+      logger.info('✓ Using cached permissions', {
+        username: githubUser.login,
+        repoCount: permissions.length,
+      });
+    }
 
     // Find or create user in database
     const user = await userRepository.findOrCreate(githubUser);
@@ -79,6 +110,14 @@ router.get('/github/callback', async (req, res) => {
       secure: config.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      domain: 'localhost', // Share cookie across all localhost ports
+      path: '/',
+    });
+
+    logger.info('Setting auth cookie', {
+      domain: 'localhost',
+      secure: config.NODE_ENV === 'production',
+      sameSite: 'lax',
     });
 
     res.redirect(`${config.FRONTEND_URL}/auth/callback?auth=success`);
@@ -93,26 +132,106 @@ router.get('/github/callback', async (req, res) => {
  * GET /auth/me
  */
 router.get('/me', authenticateToken, (req: AuthRequest, res) => {
+  // Check if we have fresh cached permissions
+  const cachedPermissions = repoPermissionCache.get(req.user!.user.login);
+
   res.json({
     success: true,
     data: {
       user: req.user!.user,
-      permissions: req.user!.permissions,
+      permissions: cachedPermissions || req.user!.permissions,
       belongsToOrg: req.user!.belongsToOrg,
     },
   });
 });
 
 /**
+ * Refresh repository permissions
+ * GET /auth/refresh-permissions
+ */
+router.get('/refresh-permissions', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const username = req.user!.user.login;
+    const githubAccessToken = req.user!.githubAccessToken;
+
+    logger.info('Manual permission refresh requested', { username });
+
+    // Clear cache to force refresh
+    repoPermissionCache.clear(username);
+
+    // Fetch fresh permissions
+    const githubService = new GitHubService(githubAccessToken);
+    const permissions = await githubService.getUserRepoPermissions(username);
+
+    // Cache the results
+    repoPermissionCache.set(username, permissions);
+
+    logger.info('Permissions refreshed successfully', {
+      username,
+      repoCount: permissions.length,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        permissions,
+        count: permissions.length,
+      },
+    });
+  } catch (error) {
+    logger.error('Failed to refresh permissions', { error });
+    res.status(500).json({
+      success: false,
+      error: {
+        error: 'InternalServerError',
+        message: 'Failed to refresh permissions',
+        statusCode: 500,
+      },
+    });
+  }
+});
+
+/**
  * Logout
  * POST /auth/logout
  */
-router.post('/logout', (req, res) => {
-  res.clearCookie('token');
-  res.json({
-    success: true,
-    data: { message: 'Logged out successfully' },
-  });
+router.post('/logout', authenticateToken, (req: AuthRequest, res) => {
+  try {
+    // Clear repository permission cache for this user
+    if (req.user) {
+      const username = req.user.user.login;
+      repoPermissionCache.clear(username);
+      logger.info('User logged out, cache cleared', { username });
+    }
+
+    // Clear cookie with same options used when setting it
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: config.NODE_ENV === 'production',
+      sameSite: 'lax',
+      domain: 'localhost',
+      path: '/',
+    });
+
+    res.json({
+      success: true,
+      data: { message: 'Logged out successfully' },
+    });
+  } catch (error) {
+    logger.error('Logout failed', { error });
+    // Still clear the cookie even if there's an error
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: config.NODE_ENV === 'production',
+      sameSite: 'lax',
+      domain: 'localhost',
+      path: '/',
+    });
+    res.json({
+      success: true,
+      data: { message: 'Logged out successfully' },
+    });
+  }
 });
 
 export default router;

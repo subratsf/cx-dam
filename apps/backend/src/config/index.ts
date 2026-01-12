@@ -1,14 +1,37 @@
 import dotenv from 'dotenv';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { z } from 'zod';
 
-// Load .env from monorepo root
-// Traverse up from backend/src to reach the monorepo root
-const configPath = path.resolve(process.cwd(), '.env');
-dotenv.config({ path: configPath });
+// In TypeScript compiled to CommonJS, __dirname is available globally
+// Current file is at apps/backend/src/config/index.ts
+// In compiled JS: apps/backend/dist/config/index.js
+// Path from dist/config: ../ = dist, ../../ = backend, ../../../ = apps, ../../../../ = root
+const rootPath = path.resolve(__dirname, '../../../../.env');
 
-console.log('Loading .env from:', configPath);
+// For Heroku and production: also try process.cwd()/.env (where app is deployed)
+// This handles both local development (monorepo) and production (single deployment)
+const prodPath = path.resolve(process.cwd(), '.env');
+
+// Load environment variables - try root first, then production location
+let result = dotenv.config({ path: rootPath });
+
+if (result.error) {
+  // Try production/Heroku location
+  result = dotenv.config({ path: prodPath });
+
+  if (result.error) {
+    console.warn('⚠️  Warning: Could not load .env file');
+    console.warn('   Tried:', rootPath);
+    console.warn('   Tried:', prodPath);
+    console.warn('   Note: In production (Heroku), use Config Vars instead of .env file');
+  } else {
+    console.log('✓ Environment loaded from:', prodPath);
+  }
+} else {
+  console.log('✓ Environment loaded from:', rootPath);
+}
+
+console.log('Environment check - Has GITHUB_CLIENT_ID:', !!process.env.GITHUB_CLIENT_ID);
 
 const ConfigSchema = z.object({
   // Server

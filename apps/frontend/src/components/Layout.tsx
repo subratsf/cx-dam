@@ -1,16 +1,19 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { authApi } from '../api/auth.api';
 import { useAuthStore } from '../stores/auth.store';
 import React, { useEffect, useState, useRef } from 'react';
 
 export function Layout() {
   const location = useLocation();
+  const queryClient = useQueryClient();
   const { user, permissions, belongsToOrg, setAuth, clearAuth, hasCheckedAuth, markAuthChecked } = useAuthStore();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
   const [showRepoPermissionsModal, setShowRepoPermissionsModal] = useState(false);
   const [repoSearchQuery, setRepoSearchQuery] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [localPermissions, setLocalPermissions] = useState(permissions);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const isSearchPage = location.pathname === '/';
@@ -57,10 +60,53 @@ export function Layout() {
   }, []);
 
   const handleLogout = async () => {
-    await authApi.logout();
+    try {
+      // Call logout API to clear backend session and cache
+      await authApi.logout();
+    } catch (error) {
+      console.error('Logout API call failed:', error);
+      // Continue with logout even if API call fails
+    }
+
+    // Clear Zustand auth store (also clears localStorage due to persist middleware)
     clearAuth();
+
+    // Clear React Query cache
+    queryClient.clear();
+
+    // Clear any other localStorage items
+    localStorage.removeItem('cx-dam-auth');
+
+    // Redirect to home page (hard reload to ensure clean state)
     window.location.href = '/';
   };
+
+  const handleRefreshPermissions = async () => {
+    setIsRefreshing(true);
+    try {
+      const result = await authApi.refreshPermissions();
+      // Update local permissions
+      setLocalPermissions(result.permissions);
+      // Update auth store
+      if (user) {
+        setAuth(user, result.permissions, belongsToOrg);
+      }
+      console.log(`✅ Successfully refreshed! Found ${result.count} repositories.`);
+    } catch (error) {
+      console.error('Failed to refresh permissions:', error);
+      alert('❌ Failed to refresh permissions. Please try again.');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Update local permissions when store changes
+  useEffect(() => {
+    setLocalPermissions(permissions);
+  }, [permissions]);
+
+  // Note: Polling removed - permissions are now fetched synchronously during login
+  // No need to poll since users will have permissions immediately after OAuth callback
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
@@ -449,8 +495,31 @@ export function Layout() {
             <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
               <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900">Repository Permissions</h3>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-xl font-semibold text-gray-900">Repository Permissions</h3>
+                      <button
+                        onClick={handleRefreshPermissions}
+                        disabled={isRefreshing}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        title="Refresh permissions from GitHub"
+                      >
+                        <svg
+                          className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                          />
+                        </svg>
+                        {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                      </button>
+                    </div>
                     <p className="text-sm text-gray-500 mt-1">
                       Your access to repositories in the salesforcedocs organization
                     </p>
@@ -460,7 +529,7 @@ export function Layout() {
                       setShowRepoPermissionsModal(false);
                       setRepoSearchQuery('');
                     }}
-                    className="text-gray-400 hover:text-gray-500"
+                    className="text-gray-400 hover:text-gray-500 ml-4"
                   >
                     <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
@@ -478,24 +547,24 @@ export function Layout() {
                   <div className="grid grid-cols-4 gap-4">
                     <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
                       <p className="text-xs text-blue-600 font-medium uppercase mb-1">Total</p>
-                      <p className="text-2xl font-bold text-blue-900">{permissions.length}</p>
+                      <p className="text-2xl font-bold text-blue-900">{localPermissions.length}</p>
                     </div>
                     <div className="bg-red-50 rounded-lg p-4 border border-red-200">
                       <p className="text-xs text-red-600 font-medium uppercase mb-1">Admin</p>
                       <p className="text-2xl font-bold text-red-900">
-                        {permissions.filter(p => p.permission === 'admin').length}
+                        {localPermissions.filter(p => p.permission === 'admin').length}
                       </p>
                     </div>
                     <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
                       <p className="text-xs text-purple-600 font-medium uppercase mb-1">Maintainer</p>
                       <p className="text-2xl font-bold text-purple-900">
-                        {permissions.filter(p => p.permission === 'maintainer').length}
+                        {localPermissions.filter(p => p.permission === 'maintainer').length}
                       </p>
                     </div>
                     <div className="bg-green-50 rounded-lg p-4 border border-green-200">
                       <p className="text-xs text-green-600 font-medium uppercase mb-1">Write</p>
                       <p className="text-2xl font-bold text-green-900">
-                        {permissions.filter(p => p.permission === 'write').length}
+                        {localPermissions.filter(p => p.permission === 'write').length}
                       </p>
                     </div>
                   </div>
@@ -539,13 +608,13 @@ export function Layout() {
                   {/* Results count */}
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-gray-600">
-                      Showing {permissions.filter(p => p.repoFullName.toLowerCase().includes(repoSearchQuery.toLowerCase())).length} of {permissions.length} repositories
+                      Showing {localPermissions.filter(p => p.repoFullName.toLowerCase().includes(repoSearchQuery.toLowerCase())).length} of {localPermissions.length} repositories
                     </p>
                   </div>
 
                   {/* Repository list */}
                   <div className="border border-gray-200 rounded-lg max-h-96 overflow-y-auto">
-                    {permissions.length === 0 ? (
+                    {localPermissions.length === 0 ? (
                       <div className="text-center py-12 text-gray-500">
                         <svg
                           className="h-16 w-16 mx-auto mb-4 text-gray-400"
@@ -563,7 +632,7 @@ export function Layout() {
                         <p className="text-lg font-medium mb-2">No Repository Access</p>
                         <p className="text-sm">You don't have access to any repositories in the salesforcedocs organization.</p>
                       </div>
-                    ) : permissions.filter(p => p.repoFullName.toLowerCase().includes(repoSearchQuery.toLowerCase())).length === 0 ? (
+                    ) : localPermissions.filter(p => p.repoFullName.toLowerCase().includes(repoSearchQuery.toLowerCase())).length === 0 ? (
                       <div className="text-center py-12 text-gray-500">
                         <svg
                           className="h-16 w-16 mx-auto mb-4 text-gray-400"
@@ -583,7 +652,7 @@ export function Layout() {
                       </div>
                     ) : (
                       <div className="divide-y divide-gray-200">
-                        {permissions
+                        {localPermissions
                           .filter(p => p.repoFullName.toLowerCase().includes(repoSearchQuery.toLowerCase()))
                           .map((perm, idx) => (
                             <div
@@ -641,7 +710,7 @@ export function Layout() {
         </div>
       )}
 
-      <main className="mx-auto px-4 sm:px-6 py-8">
+      <main className="mx-auto px-4 sm:px-6 pt-8 pb-0">
         <Outlet />
       </main>
     </div>

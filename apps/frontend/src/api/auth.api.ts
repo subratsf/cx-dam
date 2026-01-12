@@ -13,6 +13,11 @@ export const authApi = {
     return extractData(response);
   },
 
+  async refreshPermissions(): Promise<{ permissions: GitHubRepoPermission[]; count: number }> {
+    const response = await apiClient.get('/auth/refresh-permissions');
+    return extractData(response);
+  },
+
   async logout(): Promise<void> {
     await apiClient.post('/auth/logout');
   },
