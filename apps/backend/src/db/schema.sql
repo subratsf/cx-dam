@@ -24,6 +24,11 @@ CREATE TABLE IF NOT EXISTS assets (
     size BIGINT NOT NULL,
     s3_key TEXT NOT NULL,
     s3_bucket VARCHAR(255) NOT NULL,
+    state VARCHAR(50) NOT NULL DEFAULT 'Stage',
+    created_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_on TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    modified_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    modified_on TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     uploaded_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -46,8 +51,11 @@ CREATE INDEX IF NOT EXISTS idx_assets_workspace ON assets(workspace);
 CREATE INDEX IF NOT EXISTS idx_assets_name ON assets(name);
 CREATE INDEX IF NOT EXISTS idx_assets_tags ON assets USING GIN(tags);
 CREATE INDEX IF NOT EXISTS idx_assets_file_type ON assets(file_type);
+CREATE INDEX IF NOT EXISTS idx_assets_state ON assets(state);
 CREATE INDEX IF NOT EXISTS idx_assets_uploaded_by ON assets(uploaded_by);
+CREATE INDEX IF NOT EXISTS idx_assets_created_by ON assets(created_by);
 CREATE INDEX IF NOT EXISTS idx_assets_created_at ON assets(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_assets_created_on ON assets(created_on DESC);
 CREATE INDEX IF NOT EXISTS idx_users_github_id ON users(github_id);
 CREATE INDEX IF NOT EXISTS idx_users_login ON users(login);
 

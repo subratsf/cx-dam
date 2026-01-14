@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { config } from '../config';
 import { logger } from '../utils/logger';
@@ -8,12 +8,27 @@ export class S3Service {
   private client: S3Client;
 
   constructor() {
+    const credentials: any = {
+      accessKeyId: config.AWS_ACCESS_KEY_ID,
+      secretAccessKey: config.AWS_SECRET_ACCESS_KEY,
+    };
+
+    // Include session token if present (required for temporary credentials)
+    if (config.AWS_SESSION_TOKEN) {
+      credentials.sessionToken = config.AWS_SESSION_TOKEN;
+    }
+
     this.client = new S3Client({
       region: config.AWS_REGION,
-      credentials: {
-        accessKeyId: config.AWS_ACCESS_KEY_ID,
-        secretAccessKey: config.AWS_SECRET_ACCESS_KEY,
-      },
+      credentials,
+    });
+
+    logger.info('S3 Service initialized', {
+      region: config.AWS_REGION,
+      bucket: config.S3_BUCKET_NAME,
+      accessKeyId: config.AWS_ACCESS_KEY_ID.substring(0, 8) + '...',
+      hasSessionToken: !!config.AWS_SESSION_TOKEN,
+      credentialType: config.AWS_ACCESS_KEY_ID.startsWith('ASIA') ? 'temporary (STS)' : 'permanent (IAM)',
     });
   }
 
@@ -31,10 +46,9 @@ export class S3Service {
     expiresIn: number = 900
   ): Promise<{ uploadUrl: string; s3Key: string }> {
     try {
-      const assetType = getAssetTypeFromMimeType(mimeType);
       const sanitizedFileName = sanitizeFileName(fileName);
-      const timestamp = Date.now();
-      const s3Key = `${workspace}/${assetType}s/${timestamp}-${sanitizedFileName}`;
+      // Upload to stage bucket: s3://dam-hack/stage/<workspace>/<asset_name>
+      const s3Key = `stage/${workspace}/${sanitizedFileName}`;
 
       const command = new PutObjectCommand({
         Bucket: config.S3_BUCKET_NAME,
@@ -97,10 +111,11 @@ export class S3Service {
 
   /**
    * Check if an object exists in S3
+   * Uses HeadObject which is more efficient than GetObject
    */
   async objectExists(s3Key: string): Promise<boolean> {
     try {
-      const command = new GetObjectCommand({
+      const command = new HeadObjectCommand({
         Bucket: config.S3_BUCKET_NAME,
         Key: s3Key,
       });
@@ -108,9 +123,41 @@ export class S3Service {
       await this.client.send(command);
       return true;
     } catch (error: any) {
-      if (error.name === 'NoSuchKey') {
+      // Handle various "not found" scenarios
+      if (
+        error.name === 'NoSuchKey' ||
+        error.name === 'NotFound' ||
+        error.$metadata?.httpStatusCode === 404
+      ) {
+        logger.debug('S3 object not found', { s3Key, errorName: error.name });
         return false;
       }
+
+      // S3 can return 403 Forbidden for:
+      // 1. Non-existent objects (bucket policy)
+      // 2. Actual permission issues (IAM)
+      // We need to distinguish between these cases
+      if (error.$metadata?.httpStatusCode === 403) {
+        logger.error('S3 returned 403 - permission denied or object not found', {
+          s3Key,
+          errorName: error.name,
+          errorMessage: error.message,
+          bucket: config.S3_BUCKET_NAME,
+          region: config.AWS_REGION,
+        });
+
+        // For now, treat as not found but this indicates a potential configuration issue
+        // TODO: Verify AWS credentials have s3:GetObject permission
+        return false;
+      }
+
+      // For any other error, log and rethrow
+      logger.error('S3 objectExists check failed', {
+        s3Key,
+        errorName: error.name,
+        errorMessage: error.message,
+        statusCode: error.$metadata?.httpStatusCode,
+      });
       throw error;
     }
   }

@@ -5,13 +5,38 @@ import { config } from '../config';
 
 export class AssetRepository {
   /**
+   * Map database row (snake_case) to Asset type (camelCase)
+   */
+  private mapRowToAsset(row: any): Asset {
+    return {
+      id: row.id,
+      name: row.name,
+      workspace: row.workspace,
+      tags: row.tags,
+      fileType: row.file_type,
+      mimeType: row.mime_type,
+      size: row.size,
+      s3Key: row.s3_key,
+      s3Bucket: row.s3_bucket,
+      state: row.state,
+      createdBy: row.created_by,
+      createdOn: row.created_on,
+      modifiedBy: row.modified_by,
+      modifiedOn: row.modified_on,
+      uploadedBy: row.uploaded_by,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  /**
    * Create a new asset
    */
   async create(data: CreateAssetInput & { s3Key: string; uploadedBy: string }): Promise<Asset> {
     try {
-      const result = await db.query<Asset>(
-        `INSERT INTO assets (name, workspace, tags, file_type, mime_type, size, s3_key, s3_bucket, uploaded_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      const result = await db.query(
+        `INSERT INTO assets (name, workspace, tags, file_type, mime_type, size, s3_key, s3_bucket, state, created_by, uploaded_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING *`,
         [
           data.name,
@@ -22,13 +47,16 @@ export class AssetRepository {
           data.size,
           data.s3Key,
           config.S3_BUCKET_NAME,
-          data.uploadedBy,
+          'Stage', // Initial state is always Stage
+          data.uploadedBy, // created_by
+          data.uploadedBy, // uploaded_by
         ]
       );
 
-      logger.info('Created new asset', { assetId: result.rows[0].id, name: data.name });
+      const asset = this.mapRowToAsset(result.rows[0]);
+      logger.info('Created new asset', { assetId: asset.id, name: data.name });
 
-      return result.rows[0];
+      return asset;
     } catch (error) {
       logger.error('Failed to create asset', { data, error });
       throw error;
@@ -40,8 +68,8 @@ export class AssetRepository {
    */
   async findById(id: string): Promise<Asset | null> {
     try {
-      const result = await db.query<Asset>('SELECT * FROM assets WHERE id = $1', [id]);
-      return result.rows[0] || null;
+      const result = await db.query('SELECT * FROM assets WHERE id = $1', [id]);
+      return result.rows[0] ? this.mapRowToAsset(result.rows[0]) : null;
     } catch (error) {
       logger.error('Failed to find asset by ID', { id, error });
       throw error;
@@ -53,11 +81,29 @@ export class AssetRepository {
    */
   async findByNameAndWorkspace(name: string, workspace: string): Promise<Asset | null> {
     try {
-      const result = await db.query<Asset>(
+      logger.debug('Querying asset by name and workspace', {
+        name,
+        workspace,
+        nameType: typeof name,
+        workspaceType: typeof workspace,
+      });
+
+      const result = await db.query(
         'SELECT * FROM assets WHERE name = $1 AND workspace = $2',
         [name, workspace]
       );
-      return result.rows[0] || null;
+
+      const found = result.rows[0] ? this.mapRowToAsset(result.rows[0]) : null;
+
+      logger.debug('Asset query result', {
+        name,
+        workspace,
+        found: !!found,
+        foundAssetId: found?.id,
+        rowCount: result.rowCount,
+      });
+
+      return found;
     } catch (error) {
       logger.error('Failed to find asset by name and workspace', { name, workspace, error });
       throw error;
@@ -67,7 +113,7 @@ export class AssetRepository {
   /**
    * Update asset
    */
-  async update(id: string, data: UpdateAssetInput): Promise<Asset> {
+  async update(id: string, data: UpdateAssetInput & { modifiedBy?: string }): Promise<Asset> {
     try {
       const fields: string[] = [];
       const values: any[] = [];
@@ -81,17 +127,22 @@ export class AssetRepository {
         fields.push(`tags = $${paramIndex++}`);
         values.push(data.tags);
       }
+      if (data.modifiedBy) {
+        fields.push(`modified_by = $${paramIndex++}`);
+        values.push(data.modifiedBy);
+        fields.push(`modified_on = CURRENT_TIMESTAMP`);
+      }
 
       values.push(id);
 
-      const result = await db.query<Asset>(
+      const result = await db.query(
         `UPDATE assets SET ${fields.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
         values
       );
 
       logger.info('Updated asset', { assetId: id });
 
-      return result.rows[0];
+      return this.mapRowToAsset(result.rows[0]);
     } catch (error) {
       logger.error('Failed to update asset', { id, error });
       throw error;
@@ -101,19 +152,19 @@ export class AssetRepository {
   /**
    * Replace asset (update s3_key and other metadata)
    */
-  async replace(id: string, s3Key: string, mimeType: string, size: number): Promise<Asset> {
+  async replace(id: string, s3Key: string, mimeType: string, size: number, modifiedBy: string): Promise<Asset> {
     try {
-      const result = await db.query<Asset>(
+      const result = await db.query(
         `UPDATE assets
-         SET s3_key = $1, mime_type = $2, size = $3, file_type = $4
-         WHERE id = $5
+         SET s3_key = $1, mime_type = $2, size = $3, file_type = $4, modified_by = $5, modified_on = CURRENT_TIMESTAMP
+         WHERE id = $6
          RETURNING *`,
-        [s3Key, mimeType, size, this.getFileTypeFromMimeType(mimeType), id]
+        [s3Key, mimeType, size, this.getFileTypeFromMimeType(mimeType), modifiedBy, id]
       );
 
       logger.info('Replaced asset', { assetId: id });
 
-      return result.rows[0];
+      return this.mapRowToAsset(result.rows[0]);
     } catch (error) {
       logger.error('Failed to replace asset', { id, error });
       throw error;
@@ -183,7 +234,7 @@ export class AssetRepository {
       values.push(query.limit, offset);
 
       // Get paginated results
-      const result = await db.query<Asset>(
+      const result = await db.query(
         `SELECT * FROM assets ${whereClause}
          ORDER BY created_at DESC
          LIMIT $${paramIndex++} OFFSET $${paramIndex}`,
@@ -191,7 +242,7 @@ export class AssetRepository {
       );
 
       return {
-        data: result.rows,
+        data: result.rows.map(row => this.mapRowToAsset(row)),
         pagination: {
           page: query.page,
           limit: query.limit,
