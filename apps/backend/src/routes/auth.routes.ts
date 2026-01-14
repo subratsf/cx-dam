@@ -15,7 +15,14 @@ const router = Router();
  * GET /auth/github
  */
 router.get('/github', (req, res) => {
-  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${config.GITHUB_CLIENT_ID}&redirect_uri=${config.GITHUB_CALLBACK_URL}&scope=read:user,user:email,read:org,repo`;
+  const callbackUrl = config.GITHUB_CALLBACK_URL;
+
+  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${config.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(callbackUrl)}&scope=read:user,user:email,read:org,repo`;
+
+  logger.info('Redirecting to GitHub OAuth', {
+    callbackUrl,
+  });
+
   res.redirect(githubAuthUrl);
 });
 
@@ -24,10 +31,13 @@ router.get('/github', (req, res) => {
  * GET /auth/github/callback
  */
 router.get('/github/callback', async (req, res) => {
+  logger.info('🔵 OAuth callback route hit', { code: req.query.code ? '***provided***' : 'missing' });
+
   try {
     const { code } = req.query;
 
     if (!code || typeof code !== 'string') {
+      logger.error('❌ No authorization code provided');
       return res.status(400).json({
         success: false,
         error: {
@@ -39,15 +49,21 @@ router.get('/github/callback', async (req, res) => {
     }
 
     // Exchange code for access token
+    logger.info('🔄 Exchanging code for access token...');
     const githubService = new GitHubService();
     const accessToken = await githubService.getAccessToken(code);
+    logger.info('✅ Access token received', { tokenLength: accessToken?.length || 0 });
 
     // Get user info with the access token
+    logger.info('🔄 Fetching GitHub user info...');
     const authenticatedGithubService = new GitHubService(accessToken);
     const githubUser = await authenticatedGithubService.getAuthenticatedUser();
+    logger.info('✅ GitHub user fetched', { login: githubUser.login, id: githubUser.id });
 
     // Check org membership
+    logger.info('🔄 Checking org membership...');
     const belongsToOrg = await authenticatedGithubService.checkOrgMembership(githubUser.login);
+    logger.info('✅ Org membership checked', { belongsToOrg });
 
     // Get repository permissions from cache or fetch synchronously
     let permissions = repoPermissionCache.get(githubUser.login);
@@ -83,20 +99,26 @@ router.get('/github/callback', async (req, res) => {
     }
 
     // Find or create user in database
+    logger.info('🔄 Finding or creating user in database...');
     const user = await userRepository.findOrCreate(githubUser);
+    logger.info('✅ User record ready', { userId: user.id, githubId: user.githubId });
 
-    // Create user session
+    // Create user session WITHOUT permissions (to keep JWT size small for cookies)
+    // Permissions are cached server-side and retrieved when needed
     const session: UserSession = {
       user,
       githubAccessToken: accessToken,
-      permissions,
+      permissions: [], // Don't store in JWT - use cache instead
       belongsToOrg,
     };
+    logger.info('🔄 Session object created', { hasUser: !!session.user, hasToken: !!session.githubAccessToken });
 
-    // Generate JWT
+    // Generate JWT (small, without permissions array)
+    logger.info('🔄 Generating JWT token...', { jwtSecret: config.JWT_SECRET ? 'present' : 'MISSING', jwtExpiry: config.JWT_EXPIRY });
     const token = jwt.sign(session, config.JWT_SECRET, {
       expiresIn: config.JWT_EXPIRY as string | number,
     } as SignOptions);
+    logger.info('✅ JWT token generated', { tokenLength: token?.length || 0, tokenPreview: token ? token.substring(0, 20) + '...' : 'EMPTY' });
 
     logger.info('User authenticated successfully', {
       userId: user.id,
@@ -104,25 +126,27 @@ router.get('/github/callback', async (req, res) => {
       belongsToOrg,
     });
 
-    // Set cookie and redirect to frontend
+    // Set cookie
+    logger.info('🔄 Setting cookie...', { tokenLength: token?.length || 0 });
     res.cookie('token', token, {
       httpOnly: true,
       secure: config.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'lax' as const,
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      domain: 'localhost', // Share cookie across all localhost ports
       path: '/',
     });
 
-    logger.info('Setting auth cookie', {
-      domain: 'localhost',
+    logger.info('✅ Auth cookie set', {
       secure: config.NODE_ENV === 'production',
       sameSite: 'lax',
+      tokenLength: token?.length || 0,
     });
 
+    // Redirect to frontend
+    logger.info('🔄 Redirecting to frontend callback');
     res.redirect(`${config.FRONTEND_URL}/auth/callback?auth=success`);
   } catch (error) {
-    logger.error('GitHub OAuth callback failed', { error });
+    logger.error('❌ GitHub OAuth callback failed', { error });
     res.redirect(`${config.FRONTEND_URL}/auth/callback?auth=failed`);
   }
 });
@@ -204,12 +228,11 @@ router.post('/logout', authenticateToken, (req: AuthRequest, res) => {
       logger.info('User logged out, cache cleared', { username });
     }
 
-    // Clear cookie with same options used when setting it
+    // Clear cookie
     res.clearCookie('token', {
       httpOnly: true,
       secure: config.NODE_ENV === 'production',
       sameSite: 'lax',
-      domain: 'localhost',
       path: '/',
     });
 
@@ -224,7 +247,6 @@ router.post('/logout', authenticateToken, (req: AuthRequest, res) => {
       httpOnly: true,
       secure: config.NODE_ENV === 'production',
       sameSite: 'lax',
-      domain: 'localhost',
       path: '/',
     });
     res.json({

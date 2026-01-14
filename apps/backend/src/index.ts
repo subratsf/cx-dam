@@ -5,9 +5,16 @@ import { db } from './db/client';
 
 async function startServer() {
   try {
-    // Test database connection
-    await db.query('SELECT NOW()');
-    logger.info('Database connection established');
+    // Test database connection (non-fatal in development)
+    try {
+      await db.query('SELECT NOW()');
+      logger.info('Database connection established');
+    } catch (dbError) {
+      logger.warn('Database connection failed - server will start but database operations will fail', { error: dbError });
+      if (config.NODE_ENV === 'production') {
+        throw dbError; // In production, database is critical
+      }
+    }
 
     // Create Express app
     const app = createApp();
