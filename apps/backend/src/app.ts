@@ -6,19 +6,23 @@ import cookieParser from 'cookie-parser';
 import { config } from './config';
 import { logger } from './utils/logger';
 import router from './routes';
-import { errorHandler, notFoundHandler } from './middleware/error.middleware';
+import { errorHandler } from './middleware/error.middleware';
 
 export function createApp() {
   const app = express();
 
-  // Security middleware
-  app.use(helmet());
-
-  // CORS
+  // CORS - allow credentials from frontend
   app.use(
     cors({
       origin: config.FRONTEND_URL,
       credentials: true,
+    })
+  );
+
+  // Security middleware
+  app.use(
+    helmet({
+      contentSecurityPolicy: false, // Disable CSP in development
     })
   );
 
@@ -40,7 +44,6 @@ export function createApp() {
   app.use('/api', router);
 
   // Error handling
-  app.use(notFoundHandler);
   app.use(errorHandler);
 
   return app;
