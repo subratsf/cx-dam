@@ -4,16 +4,32 @@ import { logger } from '../utils/logger';
 
 export class UserRepository {
   /**
+   * Map database row (snake_case) to User type (camelCase)
+   */
+  private mapRowToUser(row: any): User {
+    return {
+      id: row.id,
+      githubId: row.github_id,
+      login: row.login,
+      name: row.name,
+      email: row.email,
+      avatarUrl: row.avatar_url,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  /**
    * Find user by GitHub ID
    */
   async findByGithubId(githubId: number): Promise<User | null> {
     try {
-      const result = await db.query<User>(
+      const result = await db.query(
         'SELECT * FROM users WHERE github_id = $1',
         [githubId]
       );
 
-      return result.rows[0] || null;
+      return result.rows[0] ? this.mapRowToUser(result.rows[0]) : null;
     } catch (error) {
       logger.error('Failed to find user by GitHub ID', { githubId, error });
       throw error;
@@ -25,8 +41,8 @@ export class UserRepository {
    */
   async findById(id: string): Promise<User | null> {
     try {
-      const result = await db.query<User>('SELECT * FROM users WHERE id = $1', [id]);
-      return result.rows[0] || null;
+      const result = await db.query('SELECT * FROM users WHERE id = $1', [id]);
+      return result.rows[0] ? this.mapRowToUser(result.rows[0]) : null;
     } catch (error) {
       logger.error('Failed to find user by ID', { id, error });
       throw error;
@@ -38,16 +54,17 @@ export class UserRepository {
    */
   async create(githubUser: GitHubUser): Promise<User> {
     try {
-      const result = await db.query<User>(
+      const result = await db.query(
         `INSERT INTO users (github_id, login, name, email, avatar_url)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
         [githubUser.id, githubUser.login, githubUser.name, githubUser.email, githubUser.avatarUrl]
       );
 
-      logger.info('Created new user', { userId: result.rows[0].id, githubId: githubUser.id });
+      const user = this.mapRowToUser(result.rows[0]);
+      logger.info('Created new user', { userId: user.id, githubId: githubUser.id });
 
-      return result.rows[0];
+      return user;
     } catch (error) {
       logger.error('Failed to create user', { githubUser, error });
       throw error;
@@ -82,14 +99,14 @@ export class UserRepository {
 
       values.push(id);
 
-      const result = await db.query<User>(
+      const result = await db.query(
         `UPDATE users SET ${fields.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
         values
       );
 
       logger.info('Updated user', { userId: id });
 
-      return result.rows[0];
+      return this.mapRowToUser(result.rows[0]);
     } catch (error) {
       logger.error('Failed to update user', { id, error });
       throw error;

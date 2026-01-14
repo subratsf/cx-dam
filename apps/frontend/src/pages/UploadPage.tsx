@@ -11,11 +11,25 @@ interface FileUpload {
   file: File;
   name: string;
   workspace: string;
-  tags: string[];
+  tags: string[]; // Per-asset specific tags
   status: UploadStatus;
   progress: number;
   error?: string;
+  isValidating?: boolean;
+  isDuplicate?: boolean;
 }
+
+// Helper function to split filename into base name and extension
+const splitFileName = (filename: string): { baseName: string; extension: string } => {
+  const lastDotIndex = filename.lastIndexOf('.');
+  if (lastDotIndex === -1 || lastDotIndex === 0) {
+    return { baseName: filename, extension: '' };
+  }
+  return {
+    baseName: filename.substring(0, lastDotIndex),
+    extension: filename.substring(lastDotIndex), // includes the dot
+  };
+};
 
 // Helper function to get file type from extension
 const getFileType = (filename: string): string => {
@@ -74,18 +88,89 @@ export function UploadPage() {
   const [files, setFiles] = useState<FileUpload[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedWorkspace, setSelectedWorkspace] = useState('');
-  const [defaultTags, setDefaultTags] = useState('');
+  const [commonTags, setCommonTags] = useState('');
   const [workspaceSearch, setWorkspaceSearch] = useState('');
   const [showWorkspaceDropdown, setShowWorkspaceDropdown] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const workspaceDropdownRef = useRef<HTMLDivElement>(null);
+  const validationTimers = useRef<Record<string, NodeJS.Timeout>>({});
 
   const uploadableRepos = permissions.filter((p) => canUploadAsset(p.permission));
 
-  // Function to update file name
-  const updateFileName = (id: string, newName: string) => {
+  // Function to validate asset name uniqueness
+  const validateAssetName = async (id: string, name: string, workspace: string) => {
+    if (!name.trim() || !workspace) {
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === id ? { ...f, isValidating: false, isDuplicate: false } : f
+        )
+      );
+      return;
+    }
+
+    try {
+      setFiles((prev) =>
+        prev.map((f) => (f.id === id ? { ...f, isValidating: true } : f))
+      );
+
+      const { isUnique } = await assetApi.validateName(name, workspace);
+
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === id
+            ? {
+                ...f,
+                isValidating: false,
+                isDuplicate: !isUnique,
+                error: !isUnique
+                  ? 'An asset with this name already exists in this workspace. Please rename to upload.'
+                  : undefined,
+              }
+            : f
+        )
+      );
+    } catch (error) {
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === id ? { ...f, isValidating: false, isDuplicate: false } : f
+        )
+      );
+    }
+  };
+
+  // Function to update file name with debounced validation (preserves extension)
+  const updateFileName = (id: string, newBaseName: string) => {
+    // Get the current file to extract its extension
+    const currentFile = files.find((f) => f.id === id);
+    if (!currentFile) return;
+
+    const { extension } = splitFileName(currentFile.name);
+    const fullName = newBaseName + extension;
+
     setFiles((prev) =>
-      prev.map((f) => (f.id === id ? { ...f, name: newName } : f))
+      prev.map((f) => (f.id === id ? { ...f, name: fullName, error: undefined } : f))
+    );
+
+    // Clear existing timer for this file
+    if (validationTimers.current[id]) {
+      clearTimeout(validationTimers.current[id]);
+    }
+
+    // Set new timer for validation (debounce 500ms)
+    validationTimers.current[id] = setTimeout(() => {
+      validateAssetName(id, fullName, currentFile.workspace);
+    }, 500);
+  };
+
+  // Function to update per-asset tags
+  const updateFileTags = (id: string, tagsString: string) => {
+    const tagsArray = tagsString
+      .split(',')
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
+
+    setFiles((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, tags: tagsArray } : f))
     );
   };
 
@@ -115,31 +200,77 @@ export function UploadPage() {
 
   const uploadMutation = useMutation({
     mutationFn: async (fileUpload: FileUpload) => {
-      // Request upload URL
-      const { uploadUrl } = await assetApi.requestUploadUrl({
-        name: fileUpload.name,
-        workspace: fileUpload.workspace,
-        tags: fileUpload.tags,
-        mimeType: fileUpload.file.type,
-        size: fileUpload.file.size,
-      });
+      console.log('[Upload Flow] Starting upload for', fileUpload.name);
 
-      // Update progress
-      setFiles((prev) =>
-        prev.map((f) =>
-          f.id === fileUpload.id ? { ...f, progress: 50 } : f
-        )
-      );
+      // Combine common tags with per-asset tags
+      const commonTagsArray = commonTags
+        .split(',')
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0);
 
-      // Upload to S3
-      await assetApi.uploadToS3(uploadUrl, fileUpload.file);
+      const allTags = [...new Set([...commonTagsArray, ...fileUpload.tags])]; // Remove duplicates
 
-      // Update to 100%
-      setFiles((prev) =>
-        prev.map((f) =>
-          f.id === fileUpload.id ? { ...f, progress: 100 } : f
-        )
-      );
+      try {
+        // Step 1: Request upload URL and create DB record
+        console.log('[Upload Flow] Step 1: Requesting upload URL');
+        const { uploadUrl, assetId } = await assetApi.requestUploadUrl({
+          name: fileUpload.name,
+          workspace: fileUpload.workspace,
+          tags: allTags,
+          mimeType: fileUpload.file.type,
+          size: fileUpload.file.size,
+        });
+        console.log('[Upload Flow] Step 1 Complete: Got assetId', assetId);
+
+        // Update progress
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === fileUpload.id ? { ...f, progress: 50 } : f
+          )
+        );
+
+        // Step 2: Upload to S3
+        console.log('[Upload Flow] Step 2: Uploading to S3');
+        await assetApi.uploadToS3(uploadUrl, fileUpload.file);
+        console.log('[Upload Flow] Step 2 Complete: S3 upload finished');
+
+        // Update progress
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === fileUpload.id ? { ...f, progress: 75 } : f
+          )
+        );
+
+        // Step 3: Confirm upload completion
+        console.log('[Upload Flow] Step 3: Confirming upload');
+        await assetApi.confirmUpload(assetId);
+        console.log('[Upload Flow] Step 3 Complete: Upload confirmed');
+
+        // Update to 100%
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === fileUpload.id ? { ...f, progress: 100 } : f
+          )
+        );
+
+        console.log('[Upload Flow] ✅ Complete success for', fileUpload.name);
+      } catch (error: any) {
+        console.error('[Upload Flow] ❌ Failed at some step:', {
+          fileName: fileUpload.name,
+          error: error.message,
+          errorResponse: error.response?.data,
+        });
+
+        // If upload failed, cleanup any orphaned DB record
+        console.log('[Upload Flow] Cleaning up orphaned record due to upload failure');
+        try {
+          await assetApi.cleanupOrphanedByName(fileUpload.name, fileUpload.workspace);
+        } catch (cleanupError) {
+          console.error('[Upload Flow] Cleanup failed (non-fatal)', cleanupError);
+        }
+
+        throw error;
+      }
     },
     onSuccess: (_, fileUpload) => {
       setFiles((prev) =>
@@ -169,22 +300,34 @@ export function UploadPage() {
     // Only allow file selection if workspace is selected
     if (!selectedWorkspace) return;
 
-    const tagsArray = defaultTags
-      .split(',')
-      .map((t) => t.trim())
-      .filter((t) => t.length > 0);
+    // Check if adding these files would exceed the limit
+    const currentPendingCount = files.filter((f) => f.status !== 'success').length;
+    const filesArray = Array.from(fileList);
+    const maxAllowed = 10 - currentPendingCount;
 
-    const newFiles: FileUpload[] = Array.from(fileList).map((file) => ({
+    if (filesArray.length > maxAllowed) {
+      alert(`You can only upload up to 10 assets at a time. Currently ${currentPendingCount} assets in queue. You can add ${maxAllowed} more.`);
+      return;
+    }
+
+    const newFiles: FileUpload[] = filesArray.map((file) => ({
       id: `${Date.now()}-${Math.random()}`,
       file,
       name: file.name,
       workspace: selectedWorkspace,
-      tags: tagsArray,
+      tags: [], // Start with empty per-asset tags
       status: 'pending' as UploadStatus,
       progress: 0,
+      isValidating: false,
+      isDuplicate: false,
     }));
 
     setFiles((prev) => [...prev, ...newFiles]);
+
+    // Validate each file name
+    newFiles.forEach((file) => {
+      validateAssetName(file.id, file.name, file.workspace);
+    });
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -210,10 +353,20 @@ export function UploadPage() {
     }
   };
 
-  const startUpload = (fileUpload: FileUpload) => {
+  const startUpload = async (fileUpload: FileUpload) => {
+    // If this is a retry, first cleanup any orphaned record
+    if (fileUpload.status === 'error') {
+      console.log('[Upload Flow] Retrying upload - cleaning up orphaned record first');
+      try {
+        await assetApi.cleanupOrphanedByName(fileUpload.name, fileUpload.workspace);
+      } catch (cleanupError) {
+        console.error('[Upload Flow] Pre-upload cleanup failed (non-fatal)', cleanupError);
+      }
+    }
+
     setFiles((prev) =>
       prev.map((f) =>
-        f.id === fileUpload.id ? { ...f, status: 'uploading' } : f
+        f.id === fileUpload.id ? { ...f, status: 'uploading', error: undefined } : f
       )
     );
     uploadMutation.mutate(fileUpload);
@@ -221,7 +374,7 @@ export function UploadPage() {
 
   const uploadAll = () => {
     files
-      .filter((f) => f.status === 'pending' || f.status === 'error')
+      .filter((f) => (f.status === 'pending' || f.status === 'error') && !f.isDuplicate)
       .forEach((f) => startUpload(f));
   };
 
@@ -295,10 +448,13 @@ export function UploadPage() {
     );
   }
 
-  const pendingCount = files.filter((f) => f.status === 'pending').length;
+  const pendingCount = files.filter((f) => f.status === 'pending' && !f.isDuplicate).length;
+  const duplicateCount = files.filter((f) => f.isDuplicate).length;
   const uploadingCount = files.filter((f) => f.status === 'uploading').length;
   const successCount = files.filter((f) => f.status === 'success').length;
-  const errorCount = files.filter((f) => f.status === 'error').length;
+  const errorCount = files.filter((f) => f.status === 'error' && !f.isDuplicate).length;
+  const currentQueueCount = files.filter((f) => f.status !== 'success').length;
+  const canAddMore = currentQueueCount < 10;
 
   return (
     <div className="h-[calc(100vh-80px)] overflow-hidden flex flex-col w-full max-w-6xl mx-auto">
@@ -390,26 +546,29 @@ export function UploadPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Default Tags (optional)
+              Common Tags (applied to all assets)
             </label>
             <input
               type="text"
-              value={defaultTags}
-              onChange={(e) => setDefaultTags(e.target.value)}
-              placeholder="e.g., documentation, screenshot"
+              value={commonTags}
+              onChange={(e) => setCommonTags(e.target.value)}
+              placeholder="e.g., documentation, screenshot (optional)"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
             />
+            <p className="mt-1 text-xs text-gray-500">
+              Enter comma-separated tags that will be applied to all uploaded assets
+            </p>
           </div>
         </div>
       </div>
 
       {/* Drag & Drop area */}
       <div
-        onDragOver={selectedWorkspace ? handleDragOver : undefined}
-        onDragLeave={selectedWorkspace ? handleDragLeave : undefined}
-        onDrop={selectedWorkspace ? handleDrop : undefined}
-        className={`bg-white rounded-lg shadow border-2 border-dashed transition-colors p-12 text-center mb-6 flex-shrink-0 ${
-          !selectedWorkspace
+        onDragOver={selectedWorkspace && canAddMore ? handleDragOver : undefined}
+        onDragLeave={selectedWorkspace && canAddMore ? handleDragLeave : undefined}
+        onDrop={selectedWorkspace && canAddMore ? handleDrop : undefined}
+        className={`bg-white rounded-lg shadow border-2 border-dashed transition-colors p-8 text-center mb-6 flex-shrink-0 ${
+          !selectedWorkspace || !canAddMore
             ? 'border-gray-200 bg-gray-50 cursor-not-allowed'
             : isDragging
             ? 'border-blue-500 bg-blue-50'
@@ -421,45 +580,50 @@ export function UploadPage() {
           type="file"
           multiple
           onChange={handleFileInput}
-          disabled={!selectedWorkspace}
+          disabled={!selectedWorkspace || !canAddMore}
           className="hidden"
           id="file-upload"
         />
         <label
           htmlFor="file-upload"
-          className={!selectedWorkspace ? 'cursor-not-allowed' : 'cursor-pointer'}
+          className={!selectedWorkspace || !canAddMore ? 'cursor-not-allowed' : 'cursor-pointer'}
         >
-          <div className="flex flex-col items-center">
-            <svg
-              className={`h-16 w-16 mb-4 ${!selectedWorkspace ? 'text-gray-300' : 'text-gray-400'}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-              />
-            </svg>
-            {!selectedWorkspace ? (
-              <>
-                <p className="text-lg text-gray-400 mb-2">Please select a workspace first</p>
-                <p className="text-sm text-gray-400">Choose a repository above to enable file uploads</p>
-              </>
-            ) : (
-              <>
-                <p className="text-lg text-gray-700 mb-2">
-                  {isDragging ? 'Drop files here' : 'Drag and drop files here'}
-                </p>
-                <p className="text-sm text-gray-500 mb-4">or</p>
-                <span className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
-                  Select files
-                </span>
-              </>
-            )}
-          </div>
+          <svg
+            className={`mx-auto h-16 w-16 ${!selectedWorkspace || !canAddMore ? 'text-gray-300' : 'text-gray-400'}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+            />
+          </svg>
+          {!selectedWorkspace ? (
+            <div className="mt-4">
+              <p className="text-base text-gray-400 font-medium">Please select a workspace first</p>
+              <p className="text-sm text-gray-400">Choose a repository above to enable file uploads</p>
+            </div>
+          ) : !canAddMore ? (
+            <div className="mt-4">
+              <p className="text-base text-gray-400 font-medium">Upload limit reached</p>
+              <p className="text-sm text-gray-400">Maximum 10 assets at a time. Clear completed uploads to add more.</p>
+            </div>
+          ) : (
+            <div className="mt-4 flex flex-col items-center">
+              <p className="text-base text-gray-700 font-medium">
+                {isDragging ? 'Drop files here' : 'Drag and drop files here'}
+              </p>
+              <p className="text-sm text-gray-500 mt-1">
+                {currentQueueCount > 0 ? `${currentQueueCount}/10 assets in queue` : 'Maximum 10 assets at a time'}
+              </p>
+              <span className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium">
+                Select files
+              </span>
+            </div>
+          )}
         </label>
       </div>
 
@@ -467,7 +631,7 @@ export function UploadPage() {
       {files.length > 0 && (
         <div className="flex items-center justify-between mb-4 flex-shrink-0">
           <div className="text-sm text-gray-600">
-            {files.length} file{files.length !== 1 ? 's' : ''} •{' '}
+            {files.length} file{files.length !== 1 ? 's' : ''} {files.filter((f) => f.status !== 'success').length > 10 ? '(max 10)' : ''} •{' '}
             {successCount > 0 && (
               <span className="text-green-600">{successCount} completed</span>
             )}
@@ -483,6 +647,12 @@ export function UploadPage() {
               <>
                 {' • '}
                 <span className="text-red-600">{errorCount} failed</span>
+              </>
+            )}
+            {duplicateCount > 0 && (
+              <>
+                {' • '}
+                <span className="text-orange-600">{duplicateCount} duplicate{duplicateCount !== 1 ? 's' : ''}</span>
               </>
             )}
           </div>
@@ -517,46 +687,39 @@ export function UploadPage() {
 
       {/* Files list */}
       {files.length > 0 && (
-        <div className="bg-white rounded-lg shadow border border-gray-200 divide-y divide-gray-200 flex-1 overflow-y-auto">
-          {files.map((fileUpload) => (
+        <div className="bg-white rounded-lg shadow border border-gray-200 divide-y divide-gray-200 overflow-y-auto min-h-0">
+          {files.map((fileUpload) => {
+            const { baseName, extension } = splitFileName(fileUpload.name);
+            return (
             <div key={fileUpload.id} className="p-4 hover:bg-gray-50 transition-colors">
-              <div className="flex items-center gap-4">
-                {/* File type icon or status */}
-                <div className="flex-shrink-0">
-                  {fileUpload.status === 'uploading' ? (
+              {/* Main row with all info */}
+              <div className="flex items-center gap-3 w-full">
+                {/* Icon - Fixed width */}
+                <div className="w-10 flex-shrink-0">
+                  {fileUpload.isValidating ? (
+                    <div className="w-8 h-8 flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-400 border-t-transparent"></div>
+                    </div>
+                  ) : fileUpload.isDuplicate ? (
+                    <div className="w-8 h-8 bg-orange-100 rounded flex items-center justify-center">
+                      <svg className="h-5 w-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                  ) : fileUpload.status === 'uploading' ? (
                     <div className="w-8 h-8 flex items-center justify-center">
                       <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-600 border-t-transparent"></div>
                     </div>
                   ) : fileUpload.status === 'success' ? (
                     <div className="w-8 h-8 bg-green-100 rounded flex items-center justify-center">
-                      <svg
-                        className="h-5 w-5 text-green-600"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 13l4 4L19 7"
-                        />
+                      <svg className="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                     </div>
                   ) : fileUpload.status === 'error' ? (
                     <div className="w-8 h-8 bg-red-100 rounded flex items-center justify-center">
-                      <svg
-                        className="h-5 w-5 text-red-600"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M6 18L18 6M6 6l12 12"
-                        />
+                      <svg className="h-5 w-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     </div>
                   ) : (
@@ -564,99 +727,108 @@ export function UploadPage() {
                   )}
                 </div>
 
-                {/* File info */}
-                <div className="flex-grow min-w-0">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="min-w-0 flex-grow">
-                      {/* Single row with name, type, and size */}
-                      <div className="flex items-center gap-3 mb-1">
-                        {/* Editable name input */}
-                        <input
-                          type="text"
-                          value={fileUpload.name}
-                          onChange={(e) => updateFileName(fileUpload.id, e.target.value)}
-                          disabled={fileUpload.status !== 'pending'}
-                          className="flex-grow text-sm font-medium text-gray-900 bg-blue-50 border border-blue-200 hover:border-blue-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 rounded px-2 py-1 disabled:bg-gray-100 disabled:border-gray-200 disabled:cursor-not-allowed disabled:text-gray-600 min-w-0"
-                          placeholder="Asset name"
-                        />
+                {/* Asset Name Input - Flexible width */}
+                <div className="flex-1 min-w-[200px]">
+                  <input
+                    type="text"
+                    value={baseName}
+                    onChange={(e) => updateFileName(fileUpload.id, e.target.value)}
+                    disabled={fileUpload.status !== 'pending'}
+                    className={`w-full text-sm font-medium rounded px-3 py-2 focus:outline-none focus:ring-1 disabled:cursor-not-allowed disabled:text-gray-600 ${
+                      fileUpload.isDuplicate
+                        ? 'bg-orange-50 border border-orange-300 hover:border-orange-400 focus:border-orange-500 focus:ring-orange-500 text-orange-900'
+                        : 'text-gray-900 bg-white border border-gray-300 hover:border-blue-400 focus:border-blue-500 focus:ring-blue-500'
+                    } ${fileUpload.status !== 'pending' ? 'disabled:bg-gray-50 disabled:border-gray-200' : ''}`}
+                    placeholder="Asset name"
+                  />
+                </div>
 
-                        {/* Metadata inline */}
-                        <div className="flex items-center gap-2 text-xs text-gray-600 flex-shrink-0">
-                          <span className="inline-flex items-center font-medium">
-                            {getFileType(fileUpload.name).toUpperCase()}
-                          </span>
-                          <span>•</span>
-                          <span>{(fileUpload.file.size / 1024).toFixed(1)} KB</span>
-                        </div>
-                      </div>
+                {/* Extension - Fixed width */}
+                <div className="w-20 flex-shrink-0">
+                  <span className="text-sm font-medium text-gray-600 px-2 py-2 bg-gray-50 border border-gray-200 rounded block text-center truncate">
+                    {extension}
+                  </span>
+                </div>
 
-                      {/* Tags in a separate row if present */}
-                      {fileUpload.tags.length > 0 && (
-                        <div className="text-xs text-gray-500 truncate">
-                          Tags: {fileUpload.tags.join(', ')}
-                        </div>
-                      )}
+                {/* Current Tags - Flexible width */}
+                <div className="flex-1 min-w-[180px]">
+                  <input
+                    type="text"
+                    value={fileUpload.tags.join(', ')}
+                    onChange={(e) => updateFileTags(fileUpload.id, e.target.value)}
+                    disabled={fileUpload.status !== 'pending'}
+                    placeholder="Add tags..."
+                    className="w-full text-sm text-gray-700 bg-white border border-gray-300 hover:border-blue-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-3 py-2 disabled:bg-gray-50 disabled:border-gray-200 disabled:cursor-not-allowed disabled:text-gray-500"
+                  />
+                </div>
 
-                      {fileUpload.error && (
-                        <p className="text-xs text-red-600 mt-1">{fileUpload.error}</p>
-                      )}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {fileUpload.status === 'pending' && (
-                        <button
-                          onClick={() => startUpload(fileUpload)}
-                          className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-medium"
-                        >
-                          Upload
-                        </button>
-                      )}
-                      {fileUpload.status === 'error' && (
-                        <button
-                          onClick={() => startUpload(fileUpload)}
-                          className="px-3 py-1 text-xs bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors font-medium"
-                        >
-                          Retry
-                        </button>
-                      )}
-                      {fileUpload.status !== 'uploading' && (
-                        <button
-                          onClick={() => removeFile(fileUpload.id)}
-                          className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                          title="Remove file"
-                        >
-                          <svg
-                            className="h-5 w-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                            />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
+                {/* Type - Fixed width */}
+                <div className="w-28 flex-shrink-0">
+                  <div className="text-xs text-gray-500 whitespace-nowrap">
+                    <span className="font-semibold">TYPE:</span> <span className="text-gray-700">{getFileType(fileUpload.name)}</span>
                   </div>
+                </div>
 
-                  {/* Progress bar */}
-                  {fileUpload.status === 'uploading' && (
-                    <div className="mt-2 w-full bg-gray-200 rounded-full h-1">
-                      <div
-                        className="bg-blue-600 h-1 rounded-full transition-all"
-                        style={{ width: `${fileUpload.progress}%` }}
-                      ></div>
-                    </div>
+                {/* Size - Fixed width */}
+                <div className="w-28 flex-shrink-0">
+                  <div className="text-xs text-gray-500 whitespace-nowrap">
+                    <span className="font-semibold">SIZE:</span> <span className="text-gray-700">{(fileUpload.file.size / 1024).toFixed(1)} KB</span>
+                  </div>
+                </div>
+
+                {/* Actions - Fixed width */}
+                <div className="w-28 flex-shrink-0 flex items-center justify-end gap-1">
+                  {fileUpload.status === 'pending' && (
+                    <button
+                      onClick={() => startUpload(fileUpload)}
+                      disabled={fileUpload.isDuplicate || fileUpload.isValidating}
+                      className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
+                      title={fileUpload.isDuplicate ? 'Cannot upload - duplicate name' : fileUpload.isValidating ? 'Validating...' : 'Upload file'}
+                    >
+                      Upload
+                    </button>
+                  )}
+                  {fileUpload.status === 'error' && !fileUpload.isDuplicate && (
+                    <button
+                      onClick={() => startUpload(fileUpload)}
+                      className="px-3 py-1.5 text-xs bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors font-medium"
+                    >
+                      Retry
+                    </button>
+                  )}
+                  {fileUpload.status !== 'uploading' && (
+                    <button
+                      onClick={() => removeFile(fileUpload.id)}
+                      className="p-1.5 text-gray-400 hover:text-red-600 transition-colors"
+                      title="Remove file"
+                    >
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
                   )}
                 </div>
               </div>
+
+              {/* Error message - Full width below */}
+              {fileUpload.error && (
+                <div className={`text-sm mt-3 flex items-start gap-2 p-3 rounded ${fileUpload.isDuplicate ? 'bg-orange-50 text-orange-700' : 'bg-red-50 text-red-700'}`}>
+                  <svg className="h-5 w-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <span>{fileUpload.error}</span>
+                </div>
+              )}
+
+              {/* Progress bar - Full width below */}
+              {fileUpload.status === 'uploading' && (
+                <div className="mt-3 bg-gray-200 rounded-full h-2">
+                  <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${fileUpload.progress}%` }}></div>
+                </div>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

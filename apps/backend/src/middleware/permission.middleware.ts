@@ -34,11 +34,26 @@ export function requireUploadPermission(req: AuthRequest, res: Response, next: N
   // Find permission for the workspace
   const permission = req.user.permissions.find((p) => p.repoFullName === workspace);
 
+  logger.debug('Checking upload permission', {
+    userId: req.user.user.id,
+    username: req.user.user.login,
+    workspace,
+    totalPermissions: req.user.permissions.length,
+    hasPermission: !!permission,
+    permissionLevel: permission?.permission,
+    canUpload: permission ? canUploadAsset(permission.permission) : false,
+    allWorkspaces: req.user.permissions.map(p => p.repoFullName).slice(0, 5), // Show first 5
+  });
+
   if (!permission || !canUploadAsset(permission.permission)) {
     logger.warn('Upload permission denied', {
       userId: req.user.user.id,
+      username: req.user.user.login,
       workspace,
       permission: permission?.permission,
+      hasPermission: !!permission,
+      totalPermissions: req.user.permissions.length,
+      availableWorkspaces: req.user.permissions.map(p => p.repoFullName),
     });
 
     return res.status(403).json({
