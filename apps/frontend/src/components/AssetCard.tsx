@@ -8,7 +8,7 @@ interface AssetCardProps {
   onEdit?: (asset: Asset & { downloadUrl: string }) => void;
 }
 
-type CopyFormat = 'markdown-image' | 'markdown-link' | 'html-image' | 'html-anchor' | 'url';
+type CopyFormat = 'markdown-image' | 'markdown-link' | 'url';
 
 export function AssetCard({ asset, onOpenDetail, onEdit }: AssetCardProps) {
   const { permissions } = useAuthStore();
@@ -58,16 +58,11 @@ export function AssetCard({ asset, onOpenDetail, onEdit }: AssetCardProps) {
 
     switch (format) {
       case 'markdown-image':
-        text = `![${asset.name}](${url})`;
+        // SFDocs Image Syntax format: ![SFDOCSDocs](workspace/asset_name)
+        text = `![${asset.name}](${asset.workspace}/${asset.name})`;
         break;
       case 'markdown-link':
         text = `[${asset.name}](${url})`;
-        break;
-      case 'html-image':
-        text = `<img src="${url}" alt="${asset.name}" />`;
-        break;
-      case 'html-anchor':
-        text = `<a href="${url}">${asset.name}</a>`;
         break;
       case 'url':
         text = url;
@@ -266,8 +261,8 @@ export function AssetCard({ asset, onOpenDetail, onEdit }: AssetCardProps) {
                 }}
                 className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 flex items-center justify-between group"
               >
-                <span className="text-gray-700">Markdown Image</span>
-                <code className="text-[10px] text-gray-400 group-hover:text-gray-600">![](url)</code>
+                <span className="text-gray-700">SFDocs Image Syntax</span>
+                <code className="text-[10px] text-gray-400 group-hover:text-gray-600">![Title](path)</code>
               </button>
               <button
                 onClick={(e) => {
@@ -278,26 +273,6 @@ export function AssetCard({ asset, onOpenDetail, onEdit }: AssetCardProps) {
               >
                 <span className="text-gray-700">Markdown Link</span>
                 <code className="text-[10px] text-gray-400 group-hover:text-gray-600">[](url)</code>
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  copyToClipboard('html-image');
-                }}
-                className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 flex items-center justify-between group"
-              >
-                <span className="text-gray-700">HTML Image</span>
-                <code className="text-[10px] text-gray-400 group-hover:text-gray-600">&lt;img&gt;</code>
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  copyToClipboard('html-anchor');
-                }}
-                className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 flex items-center justify-between group"
-              >
-                <span className="text-gray-700">HTML Link</span>
-                <code className="text-[10px] text-gray-400 group-hover:text-gray-600">&lt;a&gt;</code>
               </button>
               <div className="border-t border-gray-100 my-0.5"></div>
               <button

@@ -257,27 +257,11 @@ export function AssetDetailModal({ asset, isOpen, onClose }: AssetDetailModalPro
                   </button>
 
                   <button
-                    onClick={() => copyToClipboard('markdown-image', `![${asset.name}](${asset.downloadUrl})`)}
+                    onClick={() => copyToClipboard('markdown-image', `![${asset.name}](${asset.workspace}/${asset.name})`)}
                     className="w-full px-4 py-2.5 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg transition-colors font-medium text-sm flex items-center justify-between text-gray-700 group"
                   >
-                    <span>Markdown Image</span>
+                    <span>SFDocs Image Syntax</span>
                     {copiedFormat === 'markdown-image' ? (
-                      <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (
-                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                    )}
-                  </button>
-
-                  <button
-                    onClick={() => copyToClipboard('html-image', `<img src="${asset.downloadUrl}" alt="${asset.name}" />`)}
-                    className="w-full px-4 py-2.5 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg transition-colors font-medium text-sm flex items-center justify-between text-gray-700 group"
-                  >
-                    <span>HTML Image</span>
-                    {copiedFormat === 'html-image' ? (
                       <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
