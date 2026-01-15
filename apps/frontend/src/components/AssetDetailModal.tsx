@@ -104,274 +104,207 @@ export function AssetDetailModal({ asset, isOpen, onClose }: AssetDetailModalPro
       {/* Modal */}
       <div className="flex min-h-full items-center justify-center p-4">
         <div
-          className="relative bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+          className="relative bg-white rounded-xl shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Close Button */}
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 z-10 p-2 rounded-full bg-white/90 hover:bg-white shadow-lg transition-colors"
-            title="Close (Esc)"
-          >
-            <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-
-          {/* Top: Preview (70% height) */}
-          <div className="bg-gray-50 flex items-center justify-center p-8" style={{ minHeight: '70vh' }}>
-              {asset.fileType === 'image' ? (
-                <img
-                  src={asset.downloadUrl}
-                  alt={asset.name}
-                  className="max-w-full max-h-full object-contain"
-                />
-              ) : asset.fileType === 'document' && asset.name.toLowerCase().endsWith('.pdf') ? (
-                <iframe
-                  src={asset.downloadUrl}
-                  className="w-full h-full min-h-[500px]"
-                  title={asset.name}
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center">
-                  {getFileTypeIcon(asset.fileType)}
-                  <p className="mt-4 text-lg text-gray-600 uppercase font-semibold tracking-wide">
-                    {asset.fileType}
-                  </p>
-                </div>
-              )}
+          {/* Header with Title and Close */}
+          <div className="sticky top-0 z-20 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+            <div className="flex-1 min-w-0 pr-4">
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-semibold text-gray-900 truncate">
+                  {asset.name}
+                </h2>
+                <span
+                  className={`px-2.5 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${
+                    isStage
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : 'bg-green-100 text-green-800'
+                  }`}
+                >
+                  {isStage ? 'STAGE' : 'PROD'}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="flex-shrink-0 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              title="Close (Esc)"
+            >
+              <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
 
-          {/* Bottom: Details (30% height, scrollable) */}
-          <div className="p-4 overflow-y-auto bg-white" style={{ maxHeight: '30vh' }}>
-              {/* Title & State Badge */}
-              <div className="mb-3">
-                <div className="flex items-start justify-between gap-3 mb-1">
-                  <h2 className="text-xl font-semibold text-gray-900 break-words flex-1">
-                    {asset.name}
-                  </h2>
-                  <span
-                    className={`px-2 py-0.5 text-xs font-bold rounded-full flex-shrink-0 ${
-                      isStage
-                        ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
-                        : 'bg-green-100 text-green-800 border border-green-300'
-                    }`}
-                  >
-                    {isStage ? 'STAGE' : 'PRODUCTION'}
-                  </span>
-                </div>
+          {/* Content Area */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6 overflow-y-auto" style={{ maxHeight: 'calc(95vh - 80px)' }}>
+            {/* Left: Image Preview (2/3 width) */}
+            <div className="lg:col-span-2">
+              <div className="bg-gray-50 rounded-lg flex items-center justify-center p-12 min-h-[500px]">
+                {asset.fileType === 'image' ? (
+                  <img
+                    src={asset.downloadUrl}
+                    alt={asset.name}
+                    className="max-w-full max-h-[70vh] object-contain"
+                  />
+                ) : asset.fileType === 'document' && asset.name.toLowerCase().endsWith('.pdf') ? (
+                  <iframe
+                    src={asset.downloadUrl}
+                    className="w-full h-full min-h-[600px] rounded"
+                    title={asset.name}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-gray-500">
+                    {getFileTypeIcon(asset.fileType)}
+                    <p className="mt-4 text-sm uppercase font-medium tracking-wide">
+                      {asset.fileType}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right: Details Sidebar (1/3 width) */}
+            <div className="lg:col-span-1 space-y-5">
+              {/* Info Box */}
+              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                 <p className="text-xs text-gray-500">
                   {isStage
-                    ? 'This asset will move to production when the PR is merged to the default branch'
+                    ? 'This asset will move to production when the PR is merged'
                     : 'This asset is live in production'}
                 </p>
-              </div>
 
-              {/* Metadata Grid */}
-              <div className="space-y-3 mb-3">
-                <div className="border-t border-gray-200 pt-2">
-                  <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
-                    Asset Information
-                  </h3>
-                  <dl className="space-y-2">
+                <div className="space-y-2.5">
+                  <div>
+                    <dt className="text-xs font-medium text-gray-500 mb-1">Workspace</dt>
+                    <dd className="text-sm text-gray-900 font-mono bg-white px-3 py-2 rounded border border-gray-200">
+                      {asset.workspace}
+                    </dd>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <dt className="text-xs font-medium text-gray-500">Workspace</dt>
-                      <dd className="mt-0.5 text-xs text-gray-900 font-mono bg-gray-50 px-2 py-1 rounded">
-                        {asset.workspace}
+                      <dt className="text-xs font-medium text-gray-500 mb-1">Type</dt>
+                      <dd className="text-sm text-gray-900 uppercase font-semibold">
+                        {asset.fileType}
                       </dd>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <dt className="text-xs font-medium text-gray-500">File Type</dt>
-                        <dd className="mt-0.5 text-xs text-gray-900 uppercase font-semibold">
-                          {asset.fileType}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-medium text-gray-500">Size</dt>
-                        <dd className="mt-0.5 text-xs text-gray-900 font-semibold">
-                          {(asset.size / 1024).toFixed(2)} KB
-                        </dd>
-                      </div>
-                    </div>
-
                     <div>
-                      <dt className="text-xs font-medium text-gray-500">Created</dt>
-                      <dd className="mt-0.5 text-xs text-gray-900">
-                        {formatDate(asset.createdAt)}
+                      <dt className="text-xs font-medium text-gray-500 mb-1">Size</dt>
+                      <dd className="text-sm text-gray-900 font-semibold">
+                        {(asset.size / 1024).toFixed(1)} KB
                       </dd>
                     </div>
+                  </div>
 
-                    {asset.updatedAt !== asset.createdAt && (
-                      <div>
-                        <dt className="text-xs font-medium text-gray-500">Last Modified</dt>
-                        <dd className="mt-0.5 text-xs text-gray-900">
-                          {formatDate(asset.updatedAt)}
-                        </dd>
-                      </div>
-                    )}
-                  </dl>
-                </div>
+                  <div>
+                    <dt className="text-xs font-medium text-gray-500 mb-1">Created</dt>
+                    <dd className="text-sm text-gray-900">
+                      {formatDate(asset.createdAt)}
+                    </dd>
+                  </div>
 
-                {/* Tags */}
-                <div className="border-t border-gray-200 pt-2">
-                  <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
-                    Tags
-                  </h3>
-                  {asset.tags.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {asset.tags.map((tag, idx) => (
-                        <span
-                          key={idx}
-                          className="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full font-medium"
-                        >
-                          {tag}
-                        </span>
-                      ))}
+                  {asset.updatedAt !== asset.createdAt && (
+                    <div>
+                      <dt className="text-xs font-medium text-gray-500 mb-1">Modified</dt>
+                      <dd className="text-sm text-gray-900">
+                        {formatDate(asset.updatedAt)}
+                      </dd>
                     </div>
-                  ) : (
-                    <p className="text-xs text-gray-500 italic">No tags</p>
                   )}
                 </div>
               </div>
 
-              {/* Copy URL Options */}
-              <div className="border-t border-gray-200 pt-3 space-y-2">
-                <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
+              {/* Tags */}
+              {asset.tags.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
+                    Tags
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {asset.tags.map((tag, idx) => (
+                      <span
+                        key={idx}
+                        className="bg-blue-50 text-blue-700 text-xs px-2.5 py-1 rounded-md font-medium border border-blue-200"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Copy URL Section */}
+              <div>
+                <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">
                   Copy URL
                 </h3>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => copyToClipboard('url', asset.downloadUrl)}
+                    className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium text-sm flex items-center justify-between group"
+                  >
+                    <span>Copy Direct URL</span>
+                    {copiedFormat === 'url' ? (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                  </button>
 
-                <button
-                  onClick={() => copyToClipboard('markdown-image', `![${asset.name}](${asset.downloadUrl})`)}
-                  className="w-full px-3 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-left transition-colors group"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-xs font-medium text-gray-900">Markdown Image</div>
-                      <code className="text-[10px] text-gray-500 mt-0.5 block">![alt](url)</code>
-                    </div>
+                  <button
+                    onClick={() => copyToClipboard('markdown-image', `![${asset.name}](${asset.downloadUrl})`)}
+                    className="w-full px-4 py-2.5 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg transition-colors font-medium text-sm flex items-center justify-between text-gray-700 group"
+                  >
+                    <span>Markdown Image</span>
                     {copiedFormat === 'markdown-image' ? (
                       <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                     ) : (
-                      <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                       </svg>
                     )}
-                  </div>
-                </button>
+                  </button>
 
-                <button
-                  onClick={() => copyToClipboard('markdown-link', `[${asset.name}](${asset.downloadUrl})`)}
-                  className="w-full px-3 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-left transition-colors group"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-xs font-medium text-gray-900">Markdown Link</div>
-                      <code className="text-[10px] text-gray-500 mt-0.5 block">[text](url)</code>
-                    </div>
-                    {copiedFormat === 'markdown-link' ? (
-                      <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (
-                      <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                    )}
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => copyToClipboard('html-image', `<img src="${asset.downloadUrl}" alt="${asset.name}" />`)}
-                  className="w-full px-3 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-left transition-colors group"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-xs font-medium text-gray-900">HTML Image</div>
-                      <code className="text-[10px] text-gray-500 mt-0.5 block">&lt;img src="url" /&gt;</code>
-                    </div>
+                  <button
+                    onClick={() => copyToClipboard('html-image', `<img src="${asset.downloadUrl}" alt="${asset.name}" />`)}
+                    className="w-full px-4 py-2.5 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg transition-colors font-medium text-sm flex items-center justify-between text-gray-700 group"
+                  >
+                    <span>HTML Image</span>
                     {copiedFormat === 'html-image' ? (
                       <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                     ) : (
-                      <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                       </svg>
                     )}
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => copyToClipboard('html-anchor', `<a href="${asset.downloadUrl}">${asset.name}</a>`)}
-                  className="w-full px-3 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-left transition-colors group"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-xs font-medium text-gray-900">HTML Link</div>
-                      <code className="text-[10px] text-gray-500 mt-0.5 block">&lt;a href="url"&gt;text&lt;/a&gt;</code>
-                    </div>
-                    {copiedFormat === 'html-anchor' ? (
-                      <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (
-                      <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                    )}
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => copyToClipboard('url', asset.downloadUrl)}
-                  className="w-full px-3 py-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg text-left transition-colors group"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-blue-900">Plain URL</div>
-                      <code className="text-[10px] text-blue-700 mt-0.5 block truncate">
-                        {asset.downloadUrl}
-                      </code>
-                    </div>
-                    <div className="flex-shrink-0">
-                      {copiedFormat === 'url' ? (
-                        <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : (
-                        <svg className="w-4 h-4 text-blue-600 group-hover:text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                      )}
-                    </div>
-                  </div>
-                </button>
+                  </button>
+                </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="border-t border-gray-200 pt-4 mt-4 flex gap-3">
+              {/* Actions */}
+              <div className="pt-4 border-t border-gray-200">
                 <a
                   href={asset.downloadUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-center font-medium transition-colors flex items-center justify-center gap-2 text-sm"
+                  className="w-full px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors font-medium text-sm flex items-center justify-center gap-2"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                   </svg>
                   Open in New Tab
                 </a>
-                <button
-                  onClick={onClose}
-                  className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors text-sm"
-                >
-                  Close
-                </button>
               </div>
+            </div>
           </div>
         </div>
       </div>

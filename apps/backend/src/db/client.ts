@@ -29,7 +29,16 @@ class DatabaseClient {
       logger.debug('Executed query', { text, duration, rows: result.rowCount });
       return result;
     } catch (error) {
-      logger.error('Database query error', { text, error });
+      logger.error('Database query error', {
+        text,
+        params,
+        error: error instanceof Error ? {
+          message: error.message,
+          stack: error.stack,
+          name: error.name,
+          ...(error as any)
+        } : error
+      });
       throw error;
     }
   }

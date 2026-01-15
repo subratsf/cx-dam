@@ -233,8 +233,11 @@ export class AssetRepository {
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
       // Count total results
+      const countQuery = `SELECT COUNT(*) as count FROM assets ${whereClause}`;
+      logger.debug('Executing count query', { query: countQuery, values });
+
       const countResult = await db.query<{ count: string }>(
-        `SELECT COUNT(*) as count FROM assets ${whereClause}`,
+        countQuery,
         values
       );
       const total = parseInt(countResult.rows[0].count);
@@ -261,7 +264,14 @@ export class AssetRepository {
         },
       };
     } catch (error) {
-      logger.error('Failed to search assets', { query, error });
+      logger.error('Failed to search assets', {
+        query,
+        error: error instanceof Error ? {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        } : error
+      });
       throw error;
     }
   }

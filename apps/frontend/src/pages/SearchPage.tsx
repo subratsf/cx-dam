@@ -398,7 +398,27 @@ export function SearchPage() {
       {/* Results grid */}
       {hasSearched && !showDropdown && (
         <div className="flex-1 overflow-y-auto w-full">
-          {isLoading ? (
+          {!shouldFetch ? (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg shadow-md p-12 text-center">
+              <svg
+                className="h-16 w-16 text-blue-400 mx-auto mb-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+              <p className="text-blue-800 text-lg font-medium mb-2">No search criteria provided</p>
+              <p className="text-blue-600 text-sm">
+                Please enter a search query or select a workspace to view assets
+              </p>
+            </div>
+          ) : isLoading ? (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
               <p className="mt-4 text-gray-600">Searching...</p>
@@ -451,6 +471,17 @@ export function SearchPage() {
             <>
               <div className="mb-4 text-base font-medium text-gray-700">
                 Found {data?.pagination.total} result{data?.pagination.total !== 1 ? 's' : ''}
+                {(debouncedQuery || workspace || fileType || tags) && (
+                  <span className="text-gray-500 font-normal">
+                    {' '}for{' '}
+                    {[
+                      debouncedQuery && `"${debouncedQuery}"`,
+                      workspace && `workspace: ${workspace}`,
+                      fileType && `type: ${fileType}`,
+                      tags && `tags: ${tags}`
+                    ].filter(Boolean).join(', ')}
+                  </span>
+                )}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                 {data?.data.map((asset) => (
@@ -459,23 +490,29 @@ export function SearchPage() {
               </div>
 
               {data && data.pagination.totalPages > 1 && (
-                <div className="flex justify-center items-center gap-2 mt-8">
+                <div className="flex justify-center items-center gap-3 mt-8 mb-8 px-4">
                   <button
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page === 1}
-                    className="px-4 py-2 bg-white border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                    className="px-4 py-2 bg-white border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors flex items-center gap-2 font-medium text-sm"
                   >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
                     Previous
                   </button>
-                  <span className="px-4 py-2 text-sm text-gray-600">
+                  <span className="px-4 py-2 text-sm text-gray-700 font-medium bg-gray-50 rounded-md border border-gray-200">
                     Page {page} of {data.pagination.totalPages}
                   </span>
                   <button
                     onClick={() => setPage((p) => p + 1)}
                     disabled={page === data.pagination.totalPages}
-                    className="px-4 py-2 bg-white border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                    className="px-4 py-2 bg-white border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors flex items-center gap-2 font-medium text-sm"
                   >
                     Next
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
                   </button>
                 </div>
               )}

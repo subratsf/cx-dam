@@ -106,9 +106,9 @@ export function AssetCard({ asset, onOpenDetail }: AssetCardProps) {
   };
 
   return (
-    <div className="bg-white rounded-md shadow-sm overflow-hidden hover:shadow-lg transition-all group relative">
+    <div className="bg-white rounded-md shadow-sm border-2 border-gray-200 hover:shadow-lg hover:border-blue-300 transition-all group relative">
       {/* Preview Area */}
-      <div className="aspect-video bg-gray-100 flex items-center justify-center overflow-hidden relative">
+      <div className="aspect-video bg-gray-100 flex items-center justify-center relative m-3 rounded-md overflow-hidden">
         {asset.fileType === 'image' ? (
           <img
             src={asset.downloadUrl}

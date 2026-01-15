@@ -12,6 +12,7 @@ interface FileUpload {
   name: string;
   workspace: string;
   tags: string[]; // Per-asset specific tags
+  tagsInput?: string; // Temporary storage for tags being edited
   status: UploadStatus;
   progress: number;
   error?: string;
@@ -162,15 +163,26 @@ export function UploadPage() {
     }, 500);
   };
 
-  // Function to update per-asset tags
+  // Function to update per-asset tags (stores raw string)
   const updateFileTags = (id: string, tagsString: string) => {
-    const tagsArray = tagsString
-      .split(',')
-      .map((t) => t.trim())
-      .filter((t) => t.length > 0);
-
     setFiles((prev) =>
-      prev.map((f) => (f.id === id ? { ...f, tags: tagsArray } : f))
+      prev.map((f) => (f.id === id ? { ...f, tagsInput: tagsString } : f))
+    );
+  };
+
+  // Function to parse tags when needed (on blur or submit)
+  const parseFileTags = (id: string) => {
+    setFiles((prev) =>
+      prev.map((f) => {
+        if (f.id === id && f.tagsInput !== undefined) {
+          const tagsArray = f.tagsInput
+            .split(',')
+            .map((t) => t.trim())
+            .filter((t) => t.length > 0);
+          return { ...f, tags: tagsArray, tagsInput: undefined };
+        }
+        return f;
+      })
     );
   };
 
@@ -196,6 +208,9 @@ export function UploadPage() {
     setSelectedWorkspace(repoFullName);
     setWorkspaceSearch(repoFullName);
     setShowWorkspaceDropdown(false);
+
+    // Clear completed uploads when changing workspace
+    setFiles((prev) => prev.filter((f) => f.status !== 'success'));
   };
 
   const uploadMutation = useMutation({
@@ -354,6 +369,13 @@ export function UploadPage() {
   };
 
   const startUpload = async (fileUpload: FileUpload) => {
+    // Parse any pending tag input before upload
+    if (fileUpload.tagsInput !== undefined) {
+      parseFileTags(fileUpload.id);
+      // Wait a tick for state to update
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+
     // If this is a retry, first cleanup any orphaned record
     if (fileUpload.status === 'error') {
       console.log('[Upload Flow] Retrying upload - cleaning up orphaned record first');
@@ -373,6 +395,14 @@ export function UploadPage() {
   };
 
   const uploadAll = () => {
+    // Parse all pending tags first
+    files.forEach((f) => {
+      if (f.tagsInput !== undefined) {
+        parseFileTags(f.id);
+      }
+    });
+
+    // Then start uploads
     files
       .filter((f) => (f.status === 'pending' || f.status === 'error') && !f.isDuplicate)
       .forEach((f) => startUpload(f));
@@ -756,10 +786,11 @@ export function UploadPage() {
                 <div className="flex-1 min-w-[180px]">
                   <input
                     type="text"
-                    value={fileUpload.tags.join(', ')}
+                    value={fileUpload.tagsInput !== undefined ? fileUpload.tagsInput : fileUpload.tags.join(', ')}
                     onChange={(e) => updateFileTags(fileUpload.id, e.target.value)}
+                    onBlur={() => parseFileTags(fileUpload.id)}
                     disabled={fileUpload.status !== 'pending' && fileUpload.status !== 'error'}
-                    placeholder="Add tags..."
+                    placeholder="Add tags (comma-separated)..."
                     className={`w-full text-sm rounded px-3 py-2 focus:outline-none focus:ring-1 disabled:cursor-not-allowed disabled:text-gray-500 ${
                       fileUpload.status === 'error'
                         ? 'text-gray-900 bg-red-50 border border-red-300 hover:border-red-400 focus:border-red-500 focus:ring-red-500'
@@ -768,15 +799,23 @@ export function UploadPage() {
                   />
                 </div>
 
+                {/* Workspace - Flexible width */}
+                <div className="flex-1 min-w-[150px]">
+                  <div className="text-xs text-gray-500">
+                    <span className="font-semibold">WORKSPACE:</span>{' '}
+                    <span className="text-gray-700 font-mono text-[11px]">{fileUpload.workspace}</span>
+                  </div>
+                </div>
+
                 {/* Type - Fixed width */}
-                <div className="w-28 flex-shrink-0">
+                <div className="w-24 flex-shrink-0">
                   <div className="text-xs text-gray-500 whitespace-nowrap">
                     <span className="font-semibold">TYPE:</span> <span className="text-gray-700">{getFileType(fileUpload.name)}</span>
                   </div>
                 </div>
 
                 {/* Size - Fixed width */}
-                <div className="w-28 flex-shrink-0">
+                <div className="w-24 flex-shrink-0">
                   <div className="text-xs text-gray-500 whitespace-nowrap">
                     <span className="font-semibold">SIZE:</span> <span className="text-gray-700">{(fileUpload.file.size / 1024).toFixed(1)} KB</span>
                   </div>
