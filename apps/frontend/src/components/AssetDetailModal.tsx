@@ -104,13 +104,13 @@ export function AssetDetailModal({ asset, isOpen, onClose }: AssetDetailModalPro
       {/* Modal */}
       <div className="flex min-h-full items-center justify-center p-4">
         <div
-          className="relative bg-white rounded-lg shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden"
+          className="relative bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Close Button */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 z-10 p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+            className="absolute top-4 right-4 z-10 p-2 rounded-full bg-white/90 hover:bg-white shadow-lg transition-colors"
             title="Close (Esc)"
           >
             <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -118,9 +118,8 @@ export function AssetDetailModal({ asset, isOpen, onClose }: AssetDetailModalPro
             </svg>
           </button>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 max-h-[90vh] overflow-y-auto">
-            {/* Left: Preview */}
-            <div className="bg-gray-50 flex items-center justify-center p-8 min-h-[400px] lg:min-h-[600px]">
+          {/* Top: Preview (70% height) */}
+          <div className="bg-gray-50 flex items-center justify-center p-8" style={{ minHeight: '70vh' }}>
               {asset.fileType === 'image' ? (
                 <img
                   src={asset.downloadUrl}
@@ -141,18 +140,18 @@ export function AssetDetailModal({ asset, isOpen, onClose }: AssetDetailModalPro
                   </p>
                 </div>
               )}
-            </div>
+          </div>
 
-            {/* Right: Details */}
-            <div className="p-8 overflow-y-auto">
+          {/* Bottom: Details (30% height, scrollable) */}
+          <div className="p-4 overflow-y-auto bg-white" style={{ maxHeight: '30vh' }}>
               {/* Title & State Badge */}
-              <div className="mb-6">
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <h2 className="text-2xl font-semibold text-gray-900 break-words flex-1">
+              <div className="mb-3">
+                <div className="flex items-start justify-between gap-3 mb-1">
+                  <h2 className="text-xl font-semibold text-gray-900 break-words flex-1">
                     {asset.name}
                   </h2>
                   <span
-                    className={`px-3 py-1 text-xs font-bold rounded-full flex-shrink-0 ${
+                    className={`px-2 py-0.5 text-xs font-bold rounded-full flex-shrink-0 ${
                       isStage
                         ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
                         : 'bg-green-100 text-green-800 border border-green-300'
@@ -161,7 +160,7 @@ export function AssetDetailModal({ asset, isOpen, onClose }: AssetDetailModalPro
                     {isStage ? 'STAGE' : 'PRODUCTION'}
                   </span>
                 </div>
-                <p className="text-sm text-gray-500">
+                <p className="text-xs text-gray-500">
                   {isStage
                     ? 'This asset will move to production when the PR is merged to the default branch'
                     : 'This asset is live in production'}
@@ -169,102 +168,95 @@ export function AssetDetailModal({ asset, isOpen, onClose }: AssetDetailModalPro
               </div>
 
               {/* Metadata Grid */}
-              <div className="space-y-4 mb-6">
-                <div className="border-t border-gray-200 pt-4">
-                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
+              <div className="space-y-3 mb-3">
+                <div className="border-t border-gray-200 pt-2">
+                  <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
                     Asset Information
                   </h3>
-                  <dl className="space-y-3">
+                  <dl className="space-y-2">
                     <div>
-                      <dt className="text-sm font-medium text-gray-500">Workspace</dt>
-                      <dd className="mt-1 text-sm text-gray-900 font-mono bg-gray-50 px-3 py-2 rounded">
+                      <dt className="text-xs font-medium text-gray-500">Workspace</dt>
+                      <dd className="mt-0.5 text-xs text-gray-900 font-mono bg-gray-50 px-2 py-1 rounded">
                         {asset.workspace}
                       </dd>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <dt className="text-sm font-medium text-gray-500">File Type</dt>
-                        <dd className="mt-1 text-sm text-gray-900 uppercase font-semibold">
+                        <dt className="text-xs font-medium text-gray-500">File Type</dt>
+                        <dd className="mt-0.5 text-xs text-gray-900 uppercase font-semibold">
                           {asset.fileType}
                         </dd>
                       </div>
                       <div>
-                        <dt className="text-sm font-medium text-gray-500">Size</dt>
-                        <dd className="mt-1 text-sm text-gray-900 font-semibold">
+                        <dt className="text-xs font-medium text-gray-500">Size</dt>
+                        <dd className="mt-0.5 text-xs text-gray-900 font-semibold">
                           {(asset.size / 1024).toFixed(2)} KB
                         </dd>
                       </div>
                     </div>
 
                     <div>
-                      <dt className="text-sm font-medium text-gray-500">Created</dt>
-                      <dd className="mt-1 text-sm text-gray-900">
+                      <dt className="text-xs font-medium text-gray-500">Created</dt>
+                      <dd className="mt-0.5 text-xs text-gray-900">
                         {formatDate(asset.createdAt)}
                       </dd>
                     </div>
 
                     {asset.updatedAt !== asset.createdAt && (
                       <div>
-                        <dt className="text-sm font-medium text-gray-500">Last Modified</dt>
-                        <dd className="mt-1 text-sm text-gray-900">
+                        <dt className="text-xs font-medium text-gray-500">Last Modified</dt>
+                        <dd className="mt-0.5 text-xs text-gray-900">
                           {formatDate(asset.updatedAt)}
                         </dd>
                       </div>
                     )}
-
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Asset ID</dt>
-                      <dd className="mt-1 text-xs text-gray-600 font-mono bg-gray-50 px-3 py-2 rounded break-all">
-                        {asset.id}
-                      </dd>
-                    </div>
                   </dl>
                 </div>
 
                 {/* Tags */}
-                <div className="border-t border-gray-200 pt-4">
-                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
+                <div className="border-t border-gray-200 pt-2">
+                  <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
                     Tags
                   </h3>
                   {asset.tags.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-1.5">
                       {asset.tags.map((tag, idx) => (
                         <span
                           key={idx}
-                          className="bg-blue-50 text-blue-700 text-sm px-3 py-1 rounded-full font-medium"
+                          className="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full font-medium"
                         >
                           {tag}
                         </span>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-500 italic">No tags</p>
+                    <p className="text-xs text-gray-500 italic">No tags</p>
                   )}
                 </div>
               </div>
 
               {/* Copy URL Options */}
-              <div className="border-t border-gray-200 pt-6 space-y-3">
-                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
+              <div className="border-t border-gray-200 pt-3 space-y-2">
+                <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
                   Copy URL
                 </h3>
 
                 <button
                   onClick={() => copyToClipboard('markdown-image', `![${asset.name}](${asset.downloadUrl})`)}
-                  className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-left transition-colors group"
+                  className="w-full px-3 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-left transition-colors group"
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-sm font-medium text-gray-900">Markdown Image</div>
-                      <code className="text-xs text-gray-500 mt-1 block">![alt](url)</code>
+                      <div className="text-xs font-medium text-gray-900">Markdown Image</div>
+                      <code className="text-[10px] text-gray-500 mt-0.5 block">![alt](url)</code>
                     </div>
                     {copiedFormat === 'markdown-image' ? (
-                      <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                     ) : (
-                      <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                       </svg>
                     )}
@@ -273,19 +265,19 @@ export function AssetDetailModal({ asset, isOpen, onClose }: AssetDetailModalPro
 
                 <button
                   onClick={() => copyToClipboard('markdown-link', `[${asset.name}](${asset.downloadUrl})`)}
-                  className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-left transition-colors group"
+                  className="w-full px-3 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-left transition-colors group"
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-sm font-medium text-gray-900">Markdown Link</div>
-                      <code className="text-xs text-gray-500 mt-1 block">[text](url)</code>
+                      <div className="text-xs font-medium text-gray-900">Markdown Link</div>
+                      <code className="text-[10px] text-gray-500 mt-0.5 block">[text](url)</code>
                     </div>
                     {copiedFormat === 'markdown-link' ? (
-                      <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                     ) : (
-                      <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                       </svg>
                     )}
@@ -294,19 +286,19 @@ export function AssetDetailModal({ asset, isOpen, onClose }: AssetDetailModalPro
 
                 <button
                   onClick={() => copyToClipboard('html-image', `<img src="${asset.downloadUrl}" alt="${asset.name}" />`)}
-                  className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-left transition-colors group"
+                  className="w-full px-3 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-left transition-colors group"
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-sm font-medium text-gray-900">HTML Image</div>
-                      <code className="text-xs text-gray-500 mt-1 block">&lt;img src="url" /&gt;</code>
+                      <div className="text-xs font-medium text-gray-900">HTML Image</div>
+                      <code className="text-[10px] text-gray-500 mt-0.5 block">&lt;img src="url" /&gt;</code>
                     </div>
                     {copiedFormat === 'html-image' ? (
-                      <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                     ) : (
-                      <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                       </svg>
                     )}
@@ -315,19 +307,19 @@ export function AssetDetailModal({ asset, isOpen, onClose }: AssetDetailModalPro
 
                 <button
                   onClick={() => copyToClipboard('html-anchor', `<a href="${asset.downloadUrl}">${asset.name}</a>`)}
-                  className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-left transition-colors group"
+                  className="w-full px-3 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-left transition-colors group"
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-sm font-medium text-gray-900">HTML Link</div>
-                      <code className="text-xs text-gray-500 mt-1 block">&lt;a href="url"&gt;text&lt;/a&gt;</code>
+                      <div className="text-xs font-medium text-gray-900">HTML Link</div>
+                      <code className="text-[10px] text-gray-500 mt-0.5 block">&lt;a href="url"&gt;text&lt;/a&gt;</code>
                     </div>
                     {copiedFormat === 'html-anchor' ? (
-                      <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                     ) : (
-                      <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                       </svg>
                     )}
@@ -336,49 +328,50 @@ export function AssetDetailModal({ asset, isOpen, onClose }: AssetDetailModalPro
 
                 <button
                   onClick={() => copyToClipboard('url', asset.downloadUrl)}
-                  className="w-full px-4 py-3 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg text-left transition-colors group"
+                  className="w-full px-3 py-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg text-left transition-colors group"
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-medium text-blue-900">Plain URL</div>
-                      <code className="text-xs text-blue-700 mt-1 block truncate max-w-md">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium text-blue-900">Plain URL</div>
+                      <code className="text-[10px] text-blue-700 mt-0.5 block truncate">
                         {asset.downloadUrl}
                       </code>
                     </div>
-                    {copiedFormat === 'url' ? (
-                      <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (
-                      <svg className="w-5 h-5 text-blue-600 group-hover:text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                    )}
+                    <div className="flex-shrink-0">
+                      {copiedFormat === 'url' ? (
+                        <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4 text-blue-600 group-hover:text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      )}
+                    </div>
                   </div>
                 </button>
               </div>
 
               {/* Action Buttons */}
-              <div className="border-t border-gray-200 pt-6 mt-6 flex gap-3">
+              <div className="border-t border-gray-200 pt-4 mt-4 flex gap-3">
                 <a
                   href={asset.downloadUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-center font-medium transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-center font-medium transition-colors flex items-center justify-center gap-2 text-sm"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                   </svg>
                   Open in New Tab
                 </a>
                 <button
                   onClick={onClose}
-                  className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
+                  className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors text-sm"
                 >
                   Close
                 </button>
               </div>
-            </div>
           </div>
         </div>
       </div>
