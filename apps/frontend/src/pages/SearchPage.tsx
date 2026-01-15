@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { assetApi } from '../api/asset.api';
 import { AssetType } from '@cx-dam/shared';
 import { useAuthStore } from '../stores/auth.store';
+import { AssetCard } from '../components/AssetCard';
 
 export function SearchPage() {
   const { permissions } = useAuthStore();
@@ -157,7 +158,10 @@ export function SearchPage() {
                 <div className="absolute inset-y-0 right-2 flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setShowFilters(!showFilters)}
+                    onClick={() => {
+                      setShowFilters(!showFilters);
+                      setShowDropdown(false); // Close dropdown when opening filters
+                    }}
                     className={`p-2 rounded-full hover:bg-gray-100 transition-colors relative ${
                       activeFiltersCount > 0 ? 'text-blue-600' : 'text-gray-500'
                     }`}
@@ -443,62 +447,12 @@ export function SearchPage() {
             </div>
           ) : (
             <>
-              <div className="mb-4 text-sm text-gray-600">
+              <div className="mb-4 text-base font-medium text-gray-700">
                 Found {data?.pagination.total} result{data?.pagination.total !== 1 ? 's' : ''}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                 {data?.data.map((asset) => (
-                  <div
-                    key={asset.id}
-                    className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow cursor-pointer group"
-                    onClick={() => window.open(asset.downloadUrl, '_blank')}
-                  >
-                    <div className="aspect-video bg-gray-100 flex items-center justify-center overflow-hidden">
-                      {asset.fileType === 'image' ? (
-                        <img
-                          src={asset.downloadUrl}
-                          alt={asset.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        />
-                      ) : (
-                        <div className="text-center p-4">
-                          <div className="text-3xl text-gray-400 mb-2">
-                            {asset.fileType === 'video' && '🎥'}
-                            {asset.fileType === 'document' && '📄'}
-                            {asset.fileType === 'archive' && '📦'}
-                            {asset.fileType === 'other' && '📎'}
-                          </div>
-                          <div className="text-xs text-gray-600 uppercase font-medium">
-                            {asset.fileType}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-3">
-                      <h3 className="font-medium text-sm text-gray-900 truncate mb-1">
-                        {asset.name}
-                      </h3>
-                      <p className="text-xs text-gray-500 truncate mb-2">{asset.workspace}</p>
-                      {asset.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mb-2">
-                          {asset.tags.slice(0, 2).map((tag, idx) => (
-                            <span
-                              key={idx}
-                              className="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                          {asset.tags.length > 2 && (
-                            <span className="text-xs text-gray-500">+{asset.tags.length - 2}</span>
-                          )}
-                        </div>
-                      )}
-                      <p className="text-xs text-gray-400">
-                        {(asset.size / 1024).toFixed(0)} KB
-                      </p>
-                    </div>
-                  </div>
+                  <AssetCard key={asset.id} asset={asset} />
                 ))}
               </div>
 

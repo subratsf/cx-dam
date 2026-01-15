@@ -36,6 +36,7 @@ console.log('Environment check - Has GITHUB_CLIENT_ID:', !!process.env.GITHUB_CL
 const ConfigSchema = z.object({
   // Server
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  PORT: z.coerce.number().optional(), // Heroku sets this automatically
   API_PORT: z.coerce.number().default(3001),
   API_BASE_URL: z.string().url(),
   FRONTEND_URL: z.string().url(),
@@ -55,6 +56,8 @@ const ConfigSchema = z.object({
   AWS_SECRET_ACCESS_KEY: z.string().min(1),
   AWS_SESSION_TOKEN: z.string().optional(),
   S3_BUCKET_NAME: z.string().min(1),
+  CLOUDFRONT_STAGE_URL: z.string().url().default('https://d37m7oxhd9ft7o.cloudfront.net'),
+  CLOUDFRONT_PROD_URL: z.string().url().default('https://desg6kh11krs9.cloudfront.net'),
 
   // JWT
   JWT_SECRET: z.string().min(32),

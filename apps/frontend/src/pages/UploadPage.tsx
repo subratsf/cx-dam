@@ -733,12 +733,14 @@ export function UploadPage() {
                     type="text"
                     value={baseName}
                     onChange={(e) => updateFileName(fileUpload.id, e.target.value)}
-                    disabled={fileUpload.status !== 'pending'}
+                    disabled={fileUpload.status !== 'pending' && fileUpload.status !== 'error'}
                     className={`w-full text-sm font-medium rounded px-3 py-2 focus:outline-none focus:ring-1 disabled:cursor-not-allowed disabled:text-gray-600 ${
                       fileUpload.isDuplicate
                         ? 'bg-orange-50 border border-orange-300 hover:border-orange-400 focus:border-orange-500 focus:ring-orange-500 text-orange-900'
+                        : fileUpload.status === 'error'
+                        ? 'text-gray-900 bg-red-50 border border-red-300 hover:border-red-400 focus:border-red-500 focus:ring-red-500'
                         : 'text-gray-900 bg-white border border-gray-300 hover:border-blue-400 focus:border-blue-500 focus:ring-blue-500'
-                    } ${fileUpload.status !== 'pending' ? 'disabled:bg-gray-50 disabled:border-gray-200' : ''}`}
+                    } ${fileUpload.status !== 'pending' && fileUpload.status !== 'error' ? 'disabled:bg-gray-50 disabled:border-gray-200' : ''}`}
                     placeholder="Asset name"
                   />
                 </div>
@@ -756,9 +758,13 @@ export function UploadPage() {
                     type="text"
                     value={fileUpload.tags.join(', ')}
                     onChange={(e) => updateFileTags(fileUpload.id, e.target.value)}
-                    disabled={fileUpload.status !== 'pending'}
+                    disabled={fileUpload.status !== 'pending' && fileUpload.status !== 'error'}
                     placeholder="Add tags..."
-                    className="w-full text-sm text-gray-700 bg-white border border-gray-300 hover:border-blue-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-3 py-2 disabled:bg-gray-50 disabled:border-gray-200 disabled:cursor-not-allowed disabled:text-gray-500"
+                    className={`w-full text-sm rounded px-3 py-2 focus:outline-none focus:ring-1 disabled:cursor-not-allowed disabled:text-gray-500 ${
+                      fileUpload.status === 'error'
+                        ? 'text-gray-900 bg-red-50 border border-red-300 hover:border-red-400 focus:border-red-500 focus:ring-red-500'
+                        : 'text-gray-700 bg-white border border-gray-300 hover:border-blue-400 focus:border-blue-500 focus:ring-blue-500'
+                    } ${fileUpload.status !== 'pending' && fileUpload.status !== 'error' ? 'disabled:bg-gray-50 disabled:border-gray-200' : ''}`}
                   />
                 </div>
 

@@ -19,11 +19,15 @@ async function startServer() {
     // Create Express app
     const app = createApp();
 
+    // Use Heroku PORT if available, otherwise use API_PORT
+    const port = config.PORT || config.API_PORT;
+
     // Start server
-    const server = app.listen(config.API_PORT, () => {
-      logger.info(`Server running on port ${config.API_PORT}`, {
+    const server = app.listen(port, () => {
+      logger.info(`Server running on port ${port}`, {
         environment: config.NODE_ENV,
         apiUrl: config.API_BASE_URL,
+        usingHerokuPort: !!config.PORT,
       });
     });
 

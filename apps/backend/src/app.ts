@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
+import path from 'path';
 import { config } from './config';
 import { logger } from './utils/logger';
 import router from './routes';
@@ -42,6 +43,20 @@ export function createApp() {
 
   // API routes
   app.use('/api', router);
+
+  // Serve frontend static files in production
+  if (config.NODE_ENV === 'production') {
+    const frontendPath = path.join(__dirname, '../../frontend/dist');
+    logger.info('Serving frontend static files from:', { frontendPath });
+
+    // Serve static files
+    app.use(express.static(frontendPath));
+
+    // Handle client-side routing - send all non-API requests to index.html
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(frontendPath, 'index.html'));
+    });
+  }
 
   // Error handling
   app.use(errorHandler);

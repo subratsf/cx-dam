@@ -205,14 +205,24 @@ export class AssetRepository {
         values.push(query.fileType);
       }
 
-      // Search by name (full-text search)
+      // Search by name (full-text search) - also search in tags and workspace
       if (query.q) {
-        conditions.push(`(name ILIKE $${paramIndex} OR to_tsvector('english', name) @@ plainto_tsquery('english', $${paramIndex}))`);
-        values.push(`%${query.q}%`);
+        // Search in name, workspace, and tags with partial matching
+        const searchPattern = `%${query.q}%`;
+        conditions.push(`(
+          name ILIKE $${paramIndex}
+          OR workspace ILIKE $${paramIndex}
+          OR to_tsvector('english', name) @@ plainto_tsquery('english', $${paramIndex})
+          OR EXISTS (
+            SELECT 1 FROM unnest(tags) AS tag
+            WHERE tag ILIKE $${paramIndex}
+          )
+        )`);
+        values.push(searchPattern);
         paramIndex++;
       }
 
-      // Filter by tags
+      // Filter by tags (exact match on comma-separated tags)
       if (query.tags) {
         const tagArray = query.tags.split(',').map((t) => t.trim());
         conditions.push(`tags && $${paramIndex}::text[]`);

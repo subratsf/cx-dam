@@ -14,6 +14,7 @@ import { s3Service } from '../services/s3.service';
 import { bloomFilterService } from '../services/bloom-filter.service';
 import { logger } from '../utils/logger';
 import { AppError } from '../middleware/error.middleware';
+import { getCloudFrontUrl } from '../utils/cloudfront';
 
 const router = Router();
 
@@ -287,13 +288,11 @@ router.get('/search', optionalAuth, async (req, res, next) => {
       limit: query.limit ?? 20,
     });
 
-    // Generate download URLs for assets
-    const assetsWithUrls = await Promise.all(
-      result.data.map(async (asset) => {
-        const downloadUrl = await s3Service.generatePresignedDownloadUrl(asset.s3Key);
-        return { ...asset, downloadUrl };
-      })
-    );
+    // Generate CloudFront URLs for assets
+    const assetsWithUrls = result.data.map((asset) => {
+      const cloudFrontUrl = getCloudFrontUrl(asset.s3Key, asset.state);
+      return { ...asset, downloadUrl: cloudFrontUrl };
+    });
 
     res.json({
       success: true,
@@ -459,12 +458,12 @@ router.get('/:id', optionalAuth, async (req, res, next) => {
       return next(new AppError(404, 'Asset not found'));
     }
 
-    // Generate download URL
-    const downloadUrl = await s3Service.generatePresignedDownloadUrl(asset.s3Key);
+    // Generate CloudFront URL
+    const cloudFrontUrl = getCloudFrontUrl(asset.s3Key, asset.state);
 
     res.json({
       success: true,
-      data: { ...asset, downloadUrl },
+      data: { ...asset, downloadUrl: cloudFrontUrl },
     });
   } catch (error) {
     next(error);
