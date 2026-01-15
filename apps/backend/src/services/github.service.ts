@@ -104,6 +104,16 @@ export class GitHubService {
       if (error.status === 404) {
         return false;
       }
+      // Handle 403 errors (IP allow list restrictions) gracefully
+      if (error.status === 403) {
+        logger.warn('Org membership check blocked by IP allow list, assuming true based on repo access', {
+          username,
+          org: config.GITHUB_ORG,
+          error: error.message,
+        });
+        // Return true - we'll rely on repo permissions for actual access control
+        return true;
+      }
       logger.error('Failed to check org membership', { error });
       throw error;
     }

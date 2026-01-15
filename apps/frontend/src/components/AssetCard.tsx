@@ -3,12 +3,12 @@ import { Asset } from '@cx-dam/shared';
 
 interface AssetCardProps {
   asset: Asset & { downloadUrl: string };
-  onPreview?: (asset: Asset & { downloadUrl: string }) => void;
+  onOpenDetail: (asset: Asset & { downloadUrl: string }) => void;
 }
 
 type CopyFormat = 'markdown-image' | 'markdown-link' | 'html-image' | 'html-anchor' | 'url';
 
-export function AssetCard({ asset, onPreview }: AssetCardProps) {
+export function AssetCard({ asset, onOpenDetail }: AssetCardProps) {
   const [showCopyMenu, setShowCopyMenu] = useState(false);
   const [copiedFormat, setCopiedFormat] = useState<CopyFormat | null>(null);
   const [showAllTags, setShowAllTags] = useState(false);
@@ -133,19 +133,19 @@ export function AssetCard({ asset, onPreview }: AssetCardProps) {
           </div>
         )}
 
-        {/* Hover overlay with Open button */}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+        {/* Hover overlay with View Details button */}
+        <div
+          className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center cursor-pointer"
+          onClick={() => onOpenDetail(asset)}
+        >
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              window.open(asset.downloadUrl, '_blank');
-            }}
             className="opacity-0 group-hover:opacity-100 transition-all transform scale-90 group-hover:scale-100 px-4 py-2 bg-white rounded-md shadow-xl flex items-center gap-1.5 hover:bg-gray-50 text-sm"
           >
             <svg className="w-4 h-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
             </svg>
-            <span className="font-medium text-gray-700">Open</span>
+            <span className="font-medium text-gray-700">View Details</span>
           </button>
         </div>
       </div>

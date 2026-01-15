@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { assetApi } from '../api/asset.api';
-import { AssetType } from '@cx-dam/shared';
+import { AssetType, Asset } from '@cx-dam/shared';
 import { useAuthStore } from '../stores/auth.store';
 import { AssetCard } from '../components/AssetCard';
+import { AssetDetailModal } from '../components/AssetDetailModal';
 
 export function SearchPage() {
   const { permissions } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedAsset, setSelectedAsset] = useState<(Asset & { downloadUrl: string }) | null>(null);
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -452,7 +454,7 @@ export function SearchPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                 {data?.data.map((asset) => (
-                  <AssetCard key={asset.id} asset={asset} />
+                  <AssetCard key={asset.id} asset={asset} onOpenDetail={setSelectedAsset} />
                 ))}
               </div>
 
@@ -480,6 +482,15 @@ export function SearchPage() {
             </>
           )}
         </div>
+      )}
+
+      {/* Asset Detail Modal */}
+      {selectedAsset && (
+        <AssetDetailModal
+          asset={selectedAsset}
+          isOpen={!!selectedAsset}
+          onClose={() => setSelectedAsset(null)}
+        />
       )}
     </div>
   );
