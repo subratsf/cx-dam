@@ -124,7 +124,7 @@ export function AssetCard({ asset, onOpenDetail, onEdit }: AssetCardProps) {
           <img
             src={asset.downloadUrl}
             alt={asset.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+            className="w-full h-full object-contain group-hover:scale-105 transition-transform"
           />
         ) : asset.fileType === 'document' && asset.name.toLowerCase().endsWith('.pdf') ? (
           <div className="w-full h-full relative">
