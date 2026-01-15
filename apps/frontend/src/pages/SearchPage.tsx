@@ -1,28 +1,36 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { assetApi } from '../api/asset.api';
 import { AssetType, Asset } from '@cx-dam/shared';
 import { useAuthStore } from '../stores/auth.store';
 import { AssetCard } from '../components/AssetCard';
 import { AssetDetailModal } from '../components/AssetDetailModal';
+import { AssetEditModal } from '../components/AssetEditModal';
 
 export function SearchPage() {
   const { permissions } = useAuthStore();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Initialize state from URL params
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
   const [selectedAsset, setSelectedAsset] = useState<(Asset & { downloadUrl: string }) | null>(null);
-  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [assetToEdit, setAssetToEdit] = useState<(Asset & { downloadUrl: string }) | null>(null);
+  const [debouncedQuery, setDebouncedQuery] = useState(searchParams.get('q') || '');
   const [showDropdown, setShowDropdown] = useState(false);
+  const [isSearchInputFocused, setIsSearchInputFocused] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
+  const [hasSearched, setHasSearched] = useState(!!(searchParams.get('q') || searchParams.get('workspace') || searchParams.get('fileType') || searchParams.get('tags')));
+  const [isReplacingAsset, setIsReplacingAsset] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
-  // Filter states
-  const [workspace, setWorkspace] = useState('');
-  const [workspaceSearch, setWorkspaceSearch] = useState('');
+  // Filter states - initialize from URL params
+  const [workspace, setWorkspace] = useState(searchParams.get('workspace') || '');
+  const [workspaceSearch, setWorkspaceSearch] = useState(searchParams.get('workspace') || '');
   const [showWorkspaceDropdown, setShowWorkspaceDropdown] = useState(false);
-  const [fileType, setFileType] = useState<AssetType | ''>('');
-  const [tags, setTags] = useState('');
-  const [page, setPage] = useState(1);
+  const [fileType, setFileType] = useState<AssetType | ''>(searchParams.get('fileType') as AssetType || '');
+  const [tags, setTags] = useState(searchParams.get('tags') || '');
+  const [page, setPage] = useState(parseInt(searchParams.get('page') || '1'));
   const workspaceDropdownRef = useRef<HTMLDivElement>(null);
 
   // Get all unique repositories from permissions
@@ -33,12 +41,31 @@ export function SearchPage() {
     repo.toLowerCase().includes(workspaceSearch.toLowerCase())
   );
 
+  // Update URL params when search state changes
+  useEffect(() => {
+    const params = new URLSearchParams();
+
+    if (debouncedQuery) params.set('q', debouncedQuery);
+    if (workspace) params.set('workspace', workspace);
+    if (fileType) params.set('fileType', fileType);
+    if (tags) params.set('tags', tags);
+    if (page > 1) params.set('page', page.toString());
+
+    // Only update URL if there are search params or we had params before
+    if (params.toString() || searchParams.toString()) {
+      setSearchParams(params, { replace: true });
+    }
+  }, [debouncedQuery, workspace, fileType, tags, page]);
+
   // Debounce search input
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedQuery(searchQuery);
       if (searchQuery.trim()) {
-        setShowDropdown(true);
+        // Only show dropdown if input is focused
+        if (isSearchInputFocused) {
+          setShowDropdown(true);
+        }
         setHasSearched(true);
       } else if (!workspace && !fileType && !tags) {
         // Reset to landing page if search is cleared and no filters are active
@@ -48,7 +75,7 @@ export function SearchPage() {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, workspace, fileType, tags]);
+  }, [searchQuery, workspace, fileType, tags, isSearchInputFocused]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -150,9 +177,17 @@ export function SearchPage() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => {
+                    setIsSearchInputFocused(true);
                     if (debouncedQuery.trim() && data) {
                       setShowDropdown(true);
                     }
+                  }}
+                  onBlur={() => {
+                    // Delay to allow clicking on dropdown items
+                    setTimeout(() => {
+                      setIsSearchInputFocused(false);
+                      setShowDropdown(false);
+                    }, 200);
                   }}
                   placeholder="Search by asset name..."
                   className="w-full pl-12 pr-24 py-4 text-lg border-2 border-gray-300 rounded-full focus:outline-none focus:border-blue-500 shadow-lg hover:shadow-xl transition-shadow"
@@ -198,8 +233,8 @@ export function SearchPage() {
               </div>
             </form>
 
-            {/* Dropdown results */}
-            {showDropdown && shouldFetch && (
+            {/* Dropdown results - only show when input is focused */}
+            {showDropdown && isSearchInputFocused && shouldFetch && (
               <div className="absolute z-10 w-full mt-2 bg-white rounded-lg shadow-2xl border border-gray-200 max-h-96 overflow-y-auto">
                 {isLoading ? (
                   <div className="p-4 text-center text-gray-500">
@@ -395,8 +430,8 @@ export function SearchPage() {
         </div>
       </div>
 
-      {/* Results grid */}
-      {hasSearched && !showDropdown && (
+      {/* Results grid - show when not focused on search input or explicitly searched */}
+      {hasSearched && (!isSearchInputFocused || !showDropdown) && (
         <div className="flex-1 overflow-y-auto w-full">
           {!shouldFetch ? (
             <div className="bg-blue-50 border border-blue-200 rounded-lg shadow-md p-12 text-center">
@@ -485,7 +520,7 @@ export function SearchPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                 {data?.data.map((asset) => (
-                  <AssetCard key={asset.id} asset={asset} onOpenDetail={setSelectedAsset} />
+                  <AssetCard key={asset.id} asset={asset} onOpenDetail={setSelectedAsset} onEdit={setAssetToEdit} />
                 ))}
               </div>
 
@@ -528,6 +563,35 @@ export function SearchPage() {
           isOpen={!!selectedAsset}
           onClose={() => setSelectedAsset(null)}
         />
+      )}
+
+      {/* Asset Edit Modal */}
+      {assetToEdit && (
+        <AssetEditModal
+          asset={assetToEdit}
+          isOpen={!!assetToEdit}
+          onClose={() => setAssetToEdit(null)}
+          onReplaceStart={() => setIsReplacingAsset(true)}
+          onReplaceComplete={() => setIsReplacingAsset(false)}
+        />
+      )}
+
+      {/* Full Page Loader during asset replacement */}
+      {isReplacingAsset && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-2xl p-8 max-w-md w-full mx-4">
+            <div className="flex flex-col items-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mb-4"></div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Replacing Asset</h3>
+              <p className="text-gray-600 text-center">
+                Uploading new file and updating metadata...
+              </p>
+              <div className="mt-4 w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div className="bg-blue-600 h-full rounded-full animate-pulse" style={{ width: '100%' }}></div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

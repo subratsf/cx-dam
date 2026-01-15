@@ -10,7 +10,7 @@ class DatabaseClient {
       connectionString: config.DATABASE_URL,
       max: 20,
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
+      connectionTimeoutMillis: 10000,
       ssl: config.NODE_ENV === 'production' || config.DATABASE_URL.includes('amazonaws.com') || config.DATABASE_URL.includes('heroku')
         ? { rejectUnauthorized: false }
         : false,

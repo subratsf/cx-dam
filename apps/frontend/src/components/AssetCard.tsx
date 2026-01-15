@@ -1,18 +1,34 @@
 import { useState, useRef, useEffect } from 'react';
-import { Asset } from '@cx-dam/shared';
+import { Asset, canEditAsset } from '@cx-dam/shared';
+import { useAuthStore } from '../stores/auth.store';
 
 interface AssetCardProps {
   asset: Asset & { downloadUrl: string };
   onOpenDetail: (asset: Asset & { downloadUrl: string }) => void;
+  onEdit?: (asset: Asset & { downloadUrl: string }) => void;
 }
 
 type CopyFormat = 'markdown-image' | 'markdown-link' | 'html-image' | 'html-anchor' | 'url';
 
-export function AssetCard({ asset, onOpenDetail }: AssetCardProps) {
+export function AssetCard({ asset, onOpenDetail, onEdit }: AssetCardProps) {
+  const { permissions } = useAuthStore();
   const [showCopyMenu, setShowCopyMenu] = useState(false);
   const [copiedFormat, setCopiedFormat] = useState<CopyFormat | null>(null);
   const [showAllTags, setShowAllTags] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Check if user can edit this asset (maintainer/admin for this workspace)
+  const userPermission = permissions.find((p) => p.repoFullName === asset.workspace);
+  const canEdit = userPermission && canEditAsset(userPermission.permission);
+
+  // Debug logging
+  console.log('[AssetCard] Permission check:', {
+    assetWorkspace: asset.workspace,
+    userPermissions: permissions,
+    userPermission,
+    canEdit,
+    hasOnEdit: !!onEdit,
+  });
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -156,6 +172,22 @@ export function AssetCard({ asset, onOpenDetail }: AssetCardProps) {
           <h3 className="font-medium text-sm text-gray-900 truncate flex-1">
             {asset.name}
           </h3>
+
+          {/* Edit Button - Only for Maintainer/Admin */}
+          {canEdit && onEdit && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(asset);
+              }}
+              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+              title="Edit asset"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </button>
+          )}
 
           {/* State Badge with Tooltip */}
           <div className="relative group/badge flex-shrink-0">

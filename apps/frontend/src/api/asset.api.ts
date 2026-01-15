@@ -1,6 +1,7 @@
 import {
   Asset,
   CreateAssetInput,
+  UpdateAssetInput,
   SearchAssetsQuery,
   PresignedUrlResponse,
   PaginatedResponse,
@@ -96,6 +97,52 @@ export const assetApi = {
   async getById(id: string): Promise<Asset & { downloadUrl: string }> {
     const response = await apiClient.get(`/assets/${id}`);
     return extractData(response);
+  },
+
+  async updateAsset(id: string, input: UpdateAssetInput): Promise<Asset & { downloadUrl: string }> {
+    const response = await apiClient.patch(`/assets/${id}`, input);
+    return extractData(response);
+  },
+
+  async replaceAsset(id: string, file: File): Promise<Asset & { downloadUrl: string }> {
+    console.log('[Replace Asset] Starting replacement', {
+      assetId: id,
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type,
+    });
+
+    // Step 1: Request presigned URL for replace
+    const replaceUrlResponse = await apiClient.put(`/assets/${id}/replace`, {
+      mimeType: file.type,
+      size: file.size,
+    });
+    const { uploadUrl, assetId, s3Key } = extractData(replaceUrlResponse);
+
+    console.log('[Replace Asset] Got presigned URL', {
+      assetId,
+      s3Key,
+    });
+
+    // Step 2: Upload file to S3
+    await this.uploadToS3(uploadUrl, file);
+
+    // Step 3: Confirm replacement
+    console.log('[Replace Asset] Confirming replacement', { assetId });
+    await apiClient.post(`/assets/${assetId}/confirm-replace`, {
+      s3Key,
+      mimeType: file.type,
+      size: file.size,
+    });
+
+    console.log('[Replace Asset] Replacement confirmed', { assetId });
+
+    // Step 4: Get updated asset info
+    return this.getById(assetId);
+  },
+
+  async deleteAsset(id: string): Promise<void> {
+    await apiClient.delete(`/assets/${id}`);
   },
 
   async delete(id: string): Promise<void> {

@@ -35,7 +35,7 @@ export class S3Service {
   /**
    * Generate a pre-signed URL for uploading a file to S3
    * @param workspace - GitHub repo name (e.g., "salesforcedocs/documentation")
-   * @param fileName - Original file name
+   * @param fileName - Original file name (for new uploads) or asset name (for replacements)
    * @param mimeType - File MIME type
    * @param expiresIn - URL expiration time in seconds (default: 15 minutes)
    */

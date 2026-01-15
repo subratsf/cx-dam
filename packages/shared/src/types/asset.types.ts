@@ -72,3 +72,10 @@ export const ValidateNameQuerySchema = z.object({
 });
 
 export type ValidateNameQuery = z.infer<typeof ValidateNameQuerySchema>;
+
+export const ReplaceAssetSchema = z.object({
+  mimeType: z.string().min(1, 'MIME type is required'),
+  size: z.number().positive('File size must be a positive number'),
+});
+
+export type ReplaceAssetInput = z.infer<typeof ReplaceAssetSchema>;

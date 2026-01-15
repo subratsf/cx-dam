@@ -27,3 +27,7 @@ export function canReplaceAsset(permission: PermissionLevel, belongsToOrg: boole
 export function canDeleteAsset(permission: PermissionLevel): boolean {
   return hasPermission(permission, PermissionLevel.MAINTAINER);
 }
+
+export function canEditAsset(permission: PermissionLevel): boolean {
+  return hasPermission(permission, PermissionLevel.MAINTAINER);
+}
