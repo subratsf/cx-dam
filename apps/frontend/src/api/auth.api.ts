@@ -7,6 +7,12 @@ export interface UserSession {
   belongsToOrg: boolean;
 }
 
+export interface PersonalAccessToken {
+  token: string;
+  expiresIn: string;
+  createdAt: string;
+}
+
 export const authApi = {
   async getMe(): Promise<UserSession> {
     const response = await apiClient.get('/auth/me');
@@ -15,6 +21,11 @@ export const authApi = {
 
   async refreshPermissions(): Promise<{ permissions: GitHubRepoPermission[]; count: number }> {
     const response = await apiClient.get('/auth/refresh-permissions');
+    return extractData(response);
+  },
+
+  async generateToken(): Promise<PersonalAccessToken> {
+    const response = await apiClient.post('/auth/generate-token');
     return extractData(response);
   },
 

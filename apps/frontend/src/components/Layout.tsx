@@ -14,6 +14,9 @@ export function Layout() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
   const [showRepoPermissionsModal, setShowRepoPermissionsModal] = useState(false);
+  const [showTokenModal, setShowTokenModal] = useState(false);
+  const [generatedToken, setGeneratedToken] = useState('');
+  const [isGeneratingToken, setIsGeneratingToken] = useState(false);
   const [repoSearchQuery, setRepoSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [localPermissions, setLocalPermissions] = useState(permissions);
@@ -61,6 +64,32 @@ export function Layout() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const handleGenerateToken = async () => {
+    setIsGeneratingToken(true);
+    try {
+      const tokenData = await authApi.generateToken();
+      setGeneratedToken(tokenData.token);
+      setShowTokenModal(true);
+      setShowUserMenu(false);
+    } catch (error) {
+      console.error('Failed to generate token:', error);
+      setToast({
+        type: 'error',
+        message: 'Failed to generate access token',
+      });
+    } finally {
+      setIsGeneratingToken(false);
+    }
+  };
+
+  const handleCopyToken = () => {
+    navigator.clipboard.writeText(generatedToken);
+    setToast({
+      type: 'success',
+      message: 'Token copied to clipboard!',
+    });
+  };
 
   const handleLogout = async () => {
     try {
@@ -318,6 +347,27 @@ export function Layout() {
                           <path d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9zm10.5-1V9h-8c-.356 0-.694.074-1 .208V2.5a1 1 0 011-1h8zM5 12.25v3.25a.25.25 0 00.4.2l1.45-1.087a.25.25 0 01.3 0L8.6 15.7a.25.25 0 00.4-.2v-3.25a.25.25 0 00-.25-.25h-3.5a.25.25 0 00-.25.25z" />
                         </svg>
                         <span>Repository Permissions</span>
+                      </button>
+
+                      <button
+                        onClick={handleGenerateToken}
+                        disabled={isGeneratingToken}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2 disabled:opacity-50"
+                      >
+                        <svg
+                          className="h-4 w-4 text-gray-500"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+                          />
+                        </svg>
+                        <span>{isGeneratingToken ? 'Generating...' : 'Copy Token for VS Code'}</span>
                       </button>
 
                       <div className="border-t border-gray-200 mt-2 pt-2">
@@ -707,6 +757,107 @@ export function Layout() {
                     setRepoSearchQuery('');
                   }}
                   className="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Token Modal for VS Code */}
+      {showTokenModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            {/* Background overlay */}
+            <div
+              className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
+              onClick={() => setShowTokenModal(false)}
+            ></div>
+
+            {/* Modal panel */}
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                      <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                      </svg>
+                      Personal Access Token
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Use this token to authenticate the VS Code extension
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowTokenModal(false)}
+                    className="text-gray-400 hover:text-gray-500"
+                  >
+                    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Warning */}
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <svg className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-medium text-yellow-800">Keep this token secure!</p>
+                        <p className="text-sm text-yellow-700 mt-1">
+                          This token has the same access as your account. Don't share it publicly and store it safely in VS Code.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Token Display */}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">Your Token</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={generatedToken}
+                        readOnly
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm bg-gray-50 text-gray-900"
+                        onClick={(e) => e.currentTarget.select()}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Valid for 365 days • Click the text to select all
+                    </p>
+                  </div>
+
+                  {/* Instructions */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-sm font-medium text-blue-900 mb-2">How to use:</p>
+                    <ol className="text-sm text-blue-800 space-y-1.5 ml-4 list-decimal">
+                      <li>Copy the token above</li>
+                      <li>Open VS Code and install the "CX DAM" extension</li>
+                      <li>Run command: "CX DAM: Authenticate with Token"</li>
+                      <li>Paste your token when prompted</li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal footer */}
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-3">
+                <button
+                  onClick={handleCopyToken}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:w-auto sm:text-sm"
+                >
+                  Copy Token
+                </button>
+                <button
+                  onClick={() => setShowTokenModal(false)}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:w-auto sm:text-sm"
                 >
                   Close
                 </button>

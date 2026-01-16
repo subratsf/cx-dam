@@ -19,6 +19,8 @@ interface FileUpload {
   isValidating?: boolean;
   isDuplicate?: boolean;
   uploadStage?: 'requesting' | 's3-upload' | 'analysis' | 'complete';
+  assetId?: string; // Asset ID after successful upload
+  downloadUrl?: string; // Download URL after successful upload
 }
 
 // Helper function to split filename into base name and extension
@@ -249,7 +251,7 @@ export function UploadPage() {
         // Update progress - 33% after requesting URL
         setFiles((prev) =>
           prev.map((f) =>
-            f.id === fileUpload.id ? { ...f, progress: 33, uploadStage: 's3-upload' } : f
+            f.id === fileUpload.id ? { ...f, progress: 33, uploadStage: 's3-upload', assetId } : f
           )
         );
 
@@ -275,17 +277,23 @@ export function UploadPage() {
 
         // Step 3: Confirm upload completion (includes AI analysis for images)
         console.log('[Upload Flow] Step 3: Confirming upload' + (isImage ? ' and analyzing image' : ''));
-        await assetApi.confirmUpload(assetId);
+        const confirmedAsset = await assetApi.confirmUpload(assetId);
         console.log('[Upload Flow] Step 3 Complete: Upload confirmed');
 
-        // Update to 100%
+        // Update to 100% with asset details
         setFiles((prev) =>
           prev.map((f) =>
-            f.id === fileUpload.id ? { ...f, progress: 100, uploadStage: 'complete' } : f
+            f.id === fileUpload.id ? {
+              ...f,
+              progress: 100,
+              uploadStage: 'complete',
+              downloadUrl: confirmedAsset.downloadUrl
+            } : f
           )
         );
 
         console.log('[Upload Flow] ✅ Complete success for', fileUpload.name);
+        return { assetId, downloadUrl: confirmedAsset.downloadUrl };
       } catch (error: any) {
         console.error('[Upload Flow] ❌ Failed at some step:', {
           fileName: fileUpload.name,
@@ -304,10 +312,10 @@ export function UploadPage() {
         throw error;
       }
     },
-    onSuccess: (_, fileUpload) => {
+    onSuccess: (data, fileUpload) => {
       setFiles((prev) =>
         prev.map((f) =>
-          f.id === fileUpload.id ? { ...f, status: 'success' } : f
+          f.id === fileUpload.id ? { ...f, status: 'success', assetId: data.assetId, downloadUrl: data.downloadUrl } : f
         )
       );
     },
@@ -437,6 +445,20 @@ export function UploadPage() {
 
   const clearCompleted = () => {
     setFiles((prev) => prev.filter((f) => f.status !== 'success'));
+  };
+
+  const copyAssetUrl = (fileUpload: FileUpload) => {
+    if (fileUpload.downloadUrl) {
+      navigator.clipboard.writeText(fileUpload.downloadUrl);
+      alert('✓ Asset URL copied to clipboard!');
+    }
+  };
+
+  const viewAssetDetails = (fileUpload: FileUpload) => {
+    if (fileUpload.assetId) {
+      // Open asset detail page in new window/tab
+      window.open(`/?assetId=${fileUpload.assetId}`, '_blank');
+    }
   };
 
   if (uploadableRepos.length === 0) {
@@ -855,27 +877,78 @@ export function UploadPage() {
                   </div>
                 </div>
 
-                {/* Actions - Fixed width */}
-                <div className="w-28 flex-shrink-0 flex items-center justify-end gap-1">
-                  {fileUpload.status === 'pending' && (
-                    <button
-                      onClick={() => startUpload(fileUpload)}
-                      disabled={fileUpload.isDuplicate || fileUpload.isValidating}
-                      className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
-                      title={fileUpload.isDuplicate ? 'Cannot upload - duplicate name' : fileUpload.isValidating ? 'Validating...' : 'Upload file'}
-                    >
-                      Upload
-                    </button>
-                  )}
-                  {fileUpload.status === 'error' && !fileUpload.isDuplicate && (
-                    <button
-                      onClick={() => startUpload(fileUpload)}
-                      className="px-3 py-1.5 text-xs bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors font-medium"
-                    >
-                      Retry
-                    </button>
-                  )}
-                  {fileUpload.status !== 'uploading' && (
+                {/* Actions - Flexible width */}
+                <div className="flex-shrink-0 flex items-center justify-end gap-1">
+                  {fileUpload.status === 'success' ? (
+                    <>
+                      <button
+                        onClick={() => viewAssetDetails(fileUpload)}
+                        className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-medium flex items-center gap-1"
+                        title="View asset details"
+                      >
+                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        View
+                      </button>
+                      <button
+                        onClick={() => copyAssetUrl(fileUpload)}
+                        className="px-3 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors font-medium flex items-center gap-1"
+                        title="Copy asset URL"
+                      >
+                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        Copy URL
+                      </button>
+                      <button
+                        onClick={() => removeFile(fileUpload.id)}
+                        className="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800 border border-gray-300 rounded hover:bg-gray-50 transition-colors font-medium"
+                        title="Clear from list"
+                      >
+                        Clear
+                      </button>
+                    </>
+                  ) : fileUpload.status === 'pending' ? (
+                    <>
+                      <button
+                        onClick={() => startUpload(fileUpload)}
+                        disabled={fileUpload.isDuplicate || fileUpload.isValidating}
+                        className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
+                        title={fileUpload.isDuplicate ? 'Cannot upload - duplicate name' : fileUpload.isValidating ? 'Validating...' : 'Upload file'}
+                      >
+                        Upload
+                      </button>
+                      <button
+                        onClick={() => removeFile(fileUpload.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-600 transition-colors"
+                        title="Remove file"
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </>
+                  ) : fileUpload.status === 'error' && !fileUpload.isDuplicate ? (
+                    <>
+                      <button
+                        onClick={() => startUpload(fileUpload)}
+                        className="px-3 py-1.5 text-xs bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors font-medium"
+                      >
+                        Retry
+                      </button>
+                      <button
+                        onClick={() => removeFile(fileUpload.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-600 transition-colors"
+                        title="Remove file"
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </>
+                  ) : fileUpload.status !== 'uploading' ? (
                     <button
                       onClick={() => removeFile(fileUpload.id)}
                       className="p-1.5 text-gray-400 hover:text-red-600 transition-colors"
@@ -885,7 +958,7 @@ export function UploadPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>
                     </button>
-                  )}
+                  ) : null}
                 </div>
               </div>
 

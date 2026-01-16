@@ -6,6 +6,7 @@ python-multipart
 pillow
 requests
 python-dotenv
+openai
 qdrant-client
 sentence-transformers
 opencv-python-headless

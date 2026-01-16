@@ -1,0 +1,216 @@
+{
+  "name": "cx-dam",
+  "displayName": "CX DAM - Digital Asset Manager",
+  "description": "Browse, search, and insert digital assets from CX DAM directly in VS Code",
+  "version": "1.0.0",
+  "publisher": "cx-dam",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "icon": "resources/icons/cx-dam-icon.png",
+  "activationEvents": [
+    "onCommand:cx-dam.authenticate",
+    "onCommand:cx-dam.authenticateWithToken",
+    "onCommand:cx-dam.showAssets",
+    "onView:cxDamAssets"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "cx-dam.authenticate",
+        "title": "CX DAM: Authenticate",
+        "icon": "$(sign-in)"
+      },
+      {
+        "command": "cx-dam.authenticateWithToken",
+        "title": "CX DAM: Authenticate with Token",
+        "icon": "$(key)"
+      },
+      {
+        "command": "cx-dam.logout",
+        "title": "CX DAM: Logout",
+        "icon": "$(sign-out)"
+      },
+      {
+        "command": "cx-dam.showAssets",
+        "title": "CX DAM: Show Assets",
+        "icon": "$(files)"
+      },
+      {
+        "command": "cx-dam.searchAssets",
+        "title": "CX DAM: Search Assets",
+        "icon": "$(search)"
+      },
+      {
+        "command": "cx-dam.refreshAssets",
+        "title": "CX DAM: Refresh Assets",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "cx-dam.insertAsset",
+        "title": "CX DAM: Insert Asset at Cursor",
+        "icon": "$(insert)"
+      },
+      {
+        "command": "cx-dam.copyAssetUrl",
+        "title": "CX DAM: Copy Asset URL",
+        "icon": "$(clippy)"
+      },
+      {
+        "command": "cx-dam.previewAsset",
+        "title": "CX DAM: Preview Asset",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "cx-dam.uploadAsset",
+        "title": "CX DAM: Upload Asset",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "cx-dam.openWebApp",
+        "title": "CX DAM: Open Web App",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "cx-dam.openSettings",
+        "title": "CX DAM: Open Settings",
+        "icon": "$(settings-gear)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "cx-dam",
+          "title": "CX DAM",
+          "icon": "resources/icons/cx-dam-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "cx-dam": [
+        {
+          "id": "cxDamAssets",
+          "name": "Assets",
+          "icon": "resources/icons/cx-dam-icon.svg"
+        },
+        {
+          "id": "cxDamWorkspaces",
+          "name": "Workspaces",
+          "icon": "$(folder)"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "cx-dam.refreshAssets",
+          "when": "view == cxDamAssets",
+          "group": "navigation"
+        },
+        {
+          "command": "cx-dam.searchAssets",
+          "when": "view == cxDamAssets",
+          "group": "navigation"
+        },
+        {
+          "command": "cx-dam.uploadAsset",
+          "when": "view == cxDamAssets",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "cx-dam.insertAsset",
+          "when": "view == cxDamAssets && viewItem == asset",
+          "group": "inline@1"
+        },
+        {
+          "command": "cx-dam.previewAsset",
+          "when": "view == cxDamAssets && viewItem == asset",
+          "group": "inline@2"
+        },
+        {
+          "command": "cx-dam.copyAssetUrl",
+          "when": "view == cxDamAssets && viewItem == asset",
+          "group": "1_actions@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "cx-dam.insertAsset",
+          "when": "false"
+        },
+        {
+          "command": "cx-dam.copyAssetUrl",
+          "when": "false"
+        },
+        {
+          "command": "cx-dam.previewAsset",
+          "when": "false"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "CX DAM",
+      "properties": {
+        "cxDam.apiUrl": {
+          "type": "string",
+          "default": "http://localhost:3001/api",
+          "description": "CX DAM API URL"
+        },
+        "cxDam.frontendUrl": {
+          "type": "string",
+          "default": "http://localhost:3000",
+          "description": "CX DAM Frontend URL (for opening upload page)"
+        },
+        "cxDam.autoInsertFormat": {
+          "type": "string",
+          "enum": [
+            "markdown-image",
+            "markdown-link",
+            "html-img",
+            "url"
+          ],
+          "default": "markdown-image",
+          "description": "Default format when inserting assets"
+        },
+        "cxDam.showAIDescriptions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show AI-generated descriptions in asset list"
+        },
+        "cxDam.enableSemanticSearch": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable semantic search with AI"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@vscode/test-electron": "^2.3.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.0.0",
+    "@vscode/vsce": "^2.22.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  }
+}

@@ -15,8 +15,11 @@ class VectorSearchService:
     """
 
     def __init__(self):
-        self.qdrant_host = os.getenv("QDRANT_HOST", "localhost")
-        self.qdrant_port = int(os.getenv("QDRANT_PORT", "6333"))
+        # Support both local and cloud Qdrant
+        self.qdrant_url = os.getenv("QDRANT_URL")  # For Qdrant Cloud (e.g., https://xxx.qdrant.io)
+        self.qdrant_api_key = os.getenv("QDRANT_API_KEY")  # For Qdrant Cloud
+        self.qdrant_host = os.getenv("QDRANT_HOST", "localhost")  # For local
+        self.qdrant_port = int(os.getenv("QDRANT_PORT", "6333"))  # For local
         self.collection_name = "asset_images"
         self.embedding_model = None
         self.qdrant_client = None
@@ -32,13 +35,23 @@ class VectorSearchService:
             self.embedding_model = SentenceTransformer('clip-ViT-B-32')
             logger.info("CLIP model loaded successfully")
 
-            # Initialize Qdrant client
-            logger.info(f"Connecting to Qdrant at {self.qdrant_host}:{self.qdrant_port}...")
-            self.qdrant_client = QdrantClient(
-                host=self.qdrant_host,
-                port=self.qdrant_port,
-                timeout=5
-            )
+            # Initialize Qdrant client (Cloud or Local)
+            if self.qdrant_url:
+                # Use Qdrant Cloud
+                logger.info(f"Connecting to Qdrant Cloud at {self.qdrant_url}...")
+                self.qdrant_client = QdrantClient(
+                    url=self.qdrant_url,
+                    api_key=self.qdrant_api_key,
+                    timeout=10
+                )
+            else:
+                # Use local Qdrant
+                logger.info(f"Connecting to local Qdrant at {self.qdrant_host}:{self.qdrant_port}...")
+                self.qdrant_client = QdrantClient(
+                    host=self.qdrant_host,
+                    port=self.qdrant_port,
+                    timeout=5
+                )
 
             # Check if collection exists, create if not
             try:
