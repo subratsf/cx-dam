@@ -17,6 +17,7 @@ import { bloomFilterService } from '../services/bloom-filter.service';
 import { logger } from '../utils/logger';
 import { AppError } from '../middleware/error.middleware';
 import { getCloudFrontUrl } from '../utils/cloudfront';
+import { imageAnalysisService } from '../services/image-analysis.service';
 
 const router = Router();
 
@@ -427,6 +428,88 @@ router.get('/search', optionalAuth, async (req, res, next) => {
 });
 
 /**
+ * Semantic search using AI-generated descriptions
+ * GET /assets/search/semantic?q=query&limit=20
+ */
+router.get('/search/semantic', optionalAuth, async (req, res, next) => {
+  try {
+    const { q, limit } = req.query;
+
+    if (!q || typeof q !== 'string') {
+      return next(new AppError(400, 'Query parameter "q" is required'));
+    }
+
+    const searchLimit = limit ? parseInt(limit as string) : 20;
+
+    logger.info('Semantic search request', { query: q, limit: searchLimit });
+
+    // Check if service is available
+    if (!await imageAnalysisService.isServiceAvailable()) {
+      return next(new AppError(503, 'Semantic search service is currently unavailable'));
+    }
+
+    // Get results from vector search
+    const vectorResults = await imageAnalysisService.searchSemantic(q, searchLimit);
+
+    // Filter out results with less than 50% relevance
+    const relevantResults = vectorResults.filter(r => r.score >= 0.5);
+
+    if (relevantResults.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          data: [],
+          pagination: {
+            page: 1,
+            limit: searchLimit,
+            total: 0,
+            totalPages: 0,
+          },
+        },
+      });
+    }
+
+    // Fetch full asset details from database
+    const assetIds = relevantResults.map(r => r.asset_id);
+    const assets = await Promise.all(
+      assetIds.map(id => assetRepository.findById(id))
+    );
+
+    // Filter out nulls and generate CloudFront URLs
+    const assetsWithUrls = assets
+      .filter((asset): asset is NonNullable<typeof asset> => asset !== null)
+      .map((asset, index) => {
+        const cloudFrontUrl = getCloudFrontUrl(asset.s3Key, asset.state);
+        return {
+          ...asset,
+          downloadUrl: cloudFrontUrl,
+          searchScore: relevantResults[index]?.score || 0,
+        };
+      });
+
+    logger.info('Semantic search complete', {
+      query: q,
+      resultsFound: assetsWithUrls.length,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        data: assetsWithUrls,
+        pagination: {
+          page: 1,
+          limit: searchLimit,
+          total: assetsWithUrls.length,
+          totalPages: 1,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * Confirm asset upload completion
  * POST /assets/:id/confirm
  */
@@ -544,6 +627,67 @@ router.post('/:id/confirm', authenticateToken, async (req: AuthRequest, res, nex
       return next(new AppError(404, 'Asset file not found in storage. The upload may not have completed successfully.'));
     }
 
+    // AI Analysis for images only
+    let aiDescription: string | null = null;
+    if (asset.fileType === 'image' && await imageAnalysisService.isServiceAvailable()) {
+      try {
+        logger.info('Starting AI analysis for image', { assetId: id });
+
+        // Download image from S3 for analysis
+        const imageUrl = await s3Service.generatePresignedDownloadUrl(asset.s3Key);
+        const imageResponse = await fetch(imageUrl);
+        const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+
+        // Full analysis: moderation + description + embeddings
+        const analysisResult = await imageAnalysisService.analyzeImage(imageBuffer);
+
+        if (!analysisResult.is_safe) {
+          // Image is inappropriate - delete from S3 and DB
+          logger.warn('Image failed content moderation', {
+            assetId: id,
+            detections: analysisResult.moderation_details.detections,
+          });
+
+          await s3Service.deleteObject(asset.s3Key);
+          await assetRepository.delete(id);
+
+          return next(new AppError(
+            400,
+            `Image contains inappropriate content: ${analysisResult.moderation_details.message}`,
+            {
+              moderation_details: analysisResult.moderation_details
+            }
+          ));
+        }
+
+        // Image is safe - store description and index
+        aiDescription = analysisResult.description;
+
+        if (aiDescription && analysisResult.embedding) {
+          // Index in vector database for semantic search
+          await imageAnalysisService.indexAsset(
+            asset.id,
+            aiDescription,
+            asset.workspace,
+            asset.name
+          );
+          logger.info('Asset indexed for semantic search', { assetId: id });
+        }
+
+      } catch (error) {
+        // Log error but don't fail the upload
+        logger.error('AI analysis failed', {
+          assetId: id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+
+    // Update asset with AI description if available
+    if (aiDescription) {
+      await assetRepository.updateAiDescription(id, aiDescription);
+    }
+
     // Add name to Bloom Filter now that upload is confirmed
     await bloomFilterService.addName(asset.workspace, asset.name);
 
@@ -553,6 +697,7 @@ router.post('/:id/confirm', authenticateToken, async (req: AuthRequest, res, nex
       userId: req.user!.user.id,
       workspace: asset.workspace,
       name: asset.name,
+      hasAiDescription: !!aiDescription,
     });
 
     res.json({

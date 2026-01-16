@@ -62,6 +62,9 @@ const ConfigSchema = z.object({
   // JWT
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRY: z.string().default('7d'),
+
+  // Image Analysis Service (optional)
+  IMAGE_ANALYSIS_SERVICE_URL: z.string().url().optional().default('http://localhost:8001'),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

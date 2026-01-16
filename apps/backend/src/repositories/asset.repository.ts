@@ -26,6 +26,7 @@ export class AssetRepository {
       uploadedBy: row.uploaded_by,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      aiDescription: row.ai_description || null,
     };
   }
 
@@ -167,6 +168,22 @@ export class AssetRepository {
       return this.mapRowToAsset(result.rows[0]);
     } catch (error) {
       logger.error('Failed to replace asset', { id, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Update AI-generated description
+   */
+  async updateAiDescription(id: string, description: string): Promise<void> {
+    try {
+      await db.query(
+        `UPDATE assets SET ai_description = $1 WHERE id = $2`,
+        [description, id]
+      );
+      logger.info('Updated AI description', { assetId: id });
+    } catch (error) {
+      logger.error('Failed to update AI description', { id, error });
       throw error;
     }
   }

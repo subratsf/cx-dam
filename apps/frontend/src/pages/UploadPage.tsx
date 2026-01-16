@@ -4,7 +4,7 @@ import { assetApi } from '../api/asset.api';
 import { useAuthStore } from '../stores/auth.store';
 import { canUploadAsset } from '@cx-dam/shared';
 
-type UploadStatus = 'pending' | 'uploading' | 'success' | 'error';
+type UploadStatus = 'pending' | 'uploading' | 'analyzing' | 'success' | 'error';
 
 interface FileUpload {
   id: string;
@@ -18,6 +18,7 @@ interface FileUpload {
   error?: string;
   isValidating?: boolean;
   isDuplicate?: boolean;
+  uploadStage?: 'requesting' | 's3-upload' | 'analysis' | 'complete';
 }
 
 // Helper function to split filename into base name and extension
@@ -225,9 +226,17 @@ export function UploadPage() {
 
       const allTags = [...new Set([...commonTagsArray, ...fileUpload.tags])]; // Remove duplicates
 
+      const isImage = fileUpload.file.type.startsWith('image/');
+
       try {
         // Step 1: Request upload URL and create DB record
         console.log('[Upload Flow] Step 1: Requesting upload URL');
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === fileUpload.id ? { ...f, uploadStage: 'requesting' } : f
+          )
+        );
+
         const { uploadUrl, assetId } = await assetApi.requestUploadUrl({
           name: fileUpload.name,
           workspace: fileUpload.workspace,
@@ -237,10 +246,10 @@ export function UploadPage() {
         });
         console.log('[Upload Flow] Step 1 Complete: Got assetId', assetId);
 
-        // Update progress
+        // Update progress - 33% after requesting URL
         setFiles((prev) =>
           prev.map((f) =>
-            f.id === fileUpload.id ? { ...f, progress: 50 } : f
+            f.id === fileUpload.id ? { ...f, progress: 33, uploadStage: 's3-upload' } : f
           )
         );
 
@@ -249,22 +258,30 @@ export function UploadPage() {
         await assetApi.uploadToS3(uploadUrl, fileUpload.file);
         console.log('[Upload Flow] Step 2 Complete: S3 upload finished');
 
-        // Update progress
+        // Update progress - 66% after S3 upload
+        // For images, show "analyzing" state; for others, show final confirmation
         setFiles((prev) =>
           prev.map((f) =>
-            f.id === fileUpload.id ? { ...f, progress: 75 } : f
+            f.id === fileUpload.id
+              ? {
+                  ...f,
+                  progress: 66,
+                  status: isImage ? 'analyzing' : 'uploading',
+                  uploadStage: 'analysis'
+                }
+              : f
           )
         );
 
-        // Step 3: Confirm upload completion
-        console.log('[Upload Flow] Step 3: Confirming upload');
+        // Step 3: Confirm upload completion (includes AI analysis for images)
+        console.log('[Upload Flow] Step 3: Confirming upload' + (isImage ? ' and analyzing image' : ''));
         await assetApi.confirmUpload(assetId);
         console.log('[Upload Flow] Step 3 Complete: Upload confirmed');
 
         // Update to 100%
         setFiles((prev) =>
           prev.map((f) =>
-            f.id === fileUpload.id ? { ...f, progress: 100 } : f
+            f.id === fileUpload.id ? { ...f, progress: 100, uploadStage: 'complete' } : f
           )
         );
 
@@ -295,13 +312,19 @@ export function UploadPage() {
       );
     },
     onError: (error: any, fileUpload) => {
+      // Check if it's a content moderation error
+      const errorMessage = error.response?.data?.error?.message || 'Upload failed';
+      const isContentModerationError = errorMessage.toLowerCase().includes('inappropriate content');
+
       setFiles((prev) =>
         prev.map((f) =>
           f.id === fileUpload.id
             ? {
                 ...f,
                 status: 'error',
-                error: error.response?.data?.error?.message || 'Upload failed',
+                error: isContentModerationError
+                  ? `⚠️ Content Moderation Failed: ${errorMessage}`
+                  : errorMessage,
               }
             : f
         )
@@ -481,6 +504,7 @@ export function UploadPage() {
   const pendingCount = files.filter((f) => f.status === 'pending' && !f.isDuplicate).length;
   const duplicateCount = files.filter((f) => f.isDuplicate).length;
   const uploadingCount = files.filter((f) => f.status === 'uploading').length;
+  const analyzingCount = files.filter((f) => f.status === 'analyzing').length;
   const successCount = files.filter((f) => f.status === 'success').length;
   const errorCount = files.filter((f) => f.status === 'error' && !f.isDuplicate).length;
   const currentQueueCount = files.filter((f) => f.status !== 'success').length;
@@ -665,11 +689,15 @@ export function UploadPage() {
             {successCount > 0 && (
               <span className="text-green-600">{successCount} completed</span>
             )}
-            {successCount > 0 && (uploadingCount > 0 || pendingCount > 0) && ' • '}
+            {successCount > 0 && (uploadingCount > 0 || analyzingCount > 0 || pendingCount > 0) && ' • '}
             {uploadingCount > 0 && (
               <span className="text-blue-600">{uploadingCount} uploading</span>
             )}
-            {(uploadingCount > 0 || successCount > 0) && pendingCount > 0 && ' • '}
+            {uploadingCount > 0 && analyzingCount > 0 && ' • '}
+            {analyzingCount > 0 && (
+              <span className="text-purple-600">{analyzingCount} analyzing</span>
+            )}
+            {(uploadingCount > 0 || analyzingCount > 0 || successCount > 0) && pendingCount > 0 && ' • '}
             {pendingCount > 0 && (
               <span className="text-gray-600">{pendingCount} pending</span>
             )}
@@ -734,6 +762,12 @@ export function UploadPage() {
                     <div className="w-8 h-8 bg-orange-100 rounded flex items-center justify-center">
                       <svg className="h-5 w-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                  ) : fileUpload.status === 'analyzing' ? (
+                    <div className="w-8 h-8 bg-purple-100 rounded flex items-center justify-center">
+                      <svg className="h-5 w-5 text-purple-600 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                       </svg>
                     </div>
                   ) : fileUpload.status === 'uploading' ? (
@@ -865,10 +899,24 @@ export function UploadPage() {
                 </div>
               )}
 
-              {/* Progress bar - Full width below */}
-              {fileUpload.status === 'uploading' && (
-                <div className="mt-3 bg-gray-200 rounded-full h-2">
-                  <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${fileUpload.progress}%` }}></div>
+              {/* Progress bar with status message - Full width below */}
+              {(fileUpload.status === 'uploading' || fileUpload.status === 'analyzing') && (
+                <div className="mt-3">
+                  <div className="flex items-center justify-between mb-1 text-xs">
+                    <span className={fileUpload.status === 'analyzing' ? 'text-purple-600 font-medium' : 'text-blue-600'}>
+                      {fileUpload.uploadStage === 'requesting' && 'Preparing upload...'}
+                      {fileUpload.uploadStage === 's3-upload' && 'Uploading to storage...'}
+                      {fileUpload.uploadStage === 'analysis' && fileUpload.status === 'analyzing' && '🔍 Analyzing image content...'}
+                      {fileUpload.uploadStage === 'analysis' && fileUpload.status === 'uploading' && 'Finalizing...'}
+                    </span>
+                    <span className="text-gray-500">{fileUpload.progress}%</span>
+                  </div>
+                  <div className="bg-gray-200 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all ${fileUpload.status === 'analyzing' ? 'bg-purple-600' : 'bg-blue-600'}`}
+                      style={{ width: `${fileUpload.progress}%` }}
+                    ></div>
+                  </div>
                 </div>
               )}
             </div>

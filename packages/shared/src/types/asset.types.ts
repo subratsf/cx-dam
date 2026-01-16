@@ -26,6 +26,7 @@ export const AssetSchema = z.object({
   uploadedBy: z.string().uuid(),
   createdAt: z.date(),
   updatedAt: z.date(),
+  aiDescription: z.string().nullable().optional(),
 });
 
 export type Asset = z.infer<typeof AssetSchema>;

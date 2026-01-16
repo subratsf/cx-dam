@@ -1,0 +1,20 @@
+# Alternative requirements for Python 3.14
+# Use this if the main requirements.txt fails
+
+fastapi
+uvicorn[standard]
+python-multipart
+pillow
+requests
+python-dotenv
+
+# These may need to be installed from source or use older Python
+# If they fail, you may need Python 3.11 or 3.12
+nudenet
+sentence-transformers
+qdrant-client
+opencv-python-headless
+
+# PyTorch - install separately if needed
+# Visit: https://pytorch.org/get-started/locally/
+# Or use: pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu

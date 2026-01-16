@@ -1,0 +1,15 @@
+# Python 3.11-3.12 required (not 3.14+)
+# Core dependencies
+fastapi
+uvicorn[standard]
+python-multipart
+pillow
+requests
+python-dotenv
+qdrant-client
+sentence-transformers
+opencv-python-headless
+torch
+torchvision
+onnxruntime
+nudenet

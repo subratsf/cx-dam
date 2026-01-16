@@ -94,6 +94,14 @@ export const assetApi = {
     return extractData(response);
   },
 
+  async semanticSearch(
+    query: string,
+    limit: number = 20
+  ): Promise<PaginatedResponse<Asset & { downloadUrl: string; searchScore?: number }>> {
+    const response = await apiClient.get('/assets/search/semantic', { params: { q: query, limit } });
+    return extractData(response);
+  },
+
   async getById(id: string): Promise<Asset & { downloadUrl: string }> {
     const response = await apiClient.get(`/assets/${id}`);
     return extractData(response);

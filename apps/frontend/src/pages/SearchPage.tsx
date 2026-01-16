@@ -13,6 +13,7 @@ export function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Initialize state from URL params
+  const [searchMode, setSearchMode] = useState<'name' | 'semantic'>(searchParams.get('mode') as 'name' | 'semantic' || 'name');
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
   const [selectedAsset, setSelectedAsset] = useState<(Asset & { downloadUrl: string }) | null>(null);
   const [assetToEdit, setAssetToEdit] = useState<(Asset & { downloadUrl: string }) | null>(null);
@@ -45,17 +46,18 @@ export function SearchPage() {
   useEffect(() => {
     const params = new URLSearchParams();
 
+    if (searchMode !== 'name') params.set('mode', searchMode);
     if (debouncedQuery) params.set('q', debouncedQuery);
-    if (workspace) params.set('workspace', workspace);
-    if (fileType) params.set('fileType', fileType);
-    if (tags) params.set('tags', tags);
+    if (workspace && searchMode === 'name') params.set('workspace', workspace);
+    if (fileType && searchMode === 'name') params.set('fileType', fileType);
+    if (tags && searchMode === 'name') params.set('tags', tags);
     if (page > 1) params.set('page', page.toString());
 
     // Only update URL if there are search params or we had params before
     if (params.toString() || searchParams.toString()) {
       setSearchParams(params, { replace: true });
     }
-  }, [debouncedQuery, workspace, fileType, tags, page]);
+  }, [searchMode, debouncedQuery, workspace, fileType, tags, page]);
 
   // Debounce search input
   useEffect(() => {
@@ -94,7 +96,9 @@ export function SearchPage() {
 
   // Only fetch when we have a search query or filters applied
   const shouldFetch = hasSearched && (!!debouncedQuery.trim() || !!workspace || !!fileType || !!tags);
+  const shouldFetchSemantic = hasSearched && searchMode === 'semantic' && !!debouncedQuery.trim();
 
+  // Name search query
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['assets', 'search', debouncedQuery, workspace, fileType, tags, page],
     queryFn: () =>
@@ -106,9 +110,23 @@ export function SearchPage() {
         page,
         limit: 20,
       }),
-    enabled: shouldFetch,
+    enabled: shouldFetch && searchMode === 'name',
     retry: false,
   });
+
+  // Semantic search query
+  const { data: semanticData, isLoading: isSemanticLoading, isError: isSemanticError, error: semanticError } = useQuery({
+    queryKey: ['assets', 'semantic-search', debouncedQuery, page],
+    queryFn: () => assetApi.semanticSearch(debouncedQuery, 20),
+    enabled: shouldFetchSemantic,
+    retry: false,
+  });
+
+  // Use appropriate data based on search mode
+  const currentData = searchMode === 'semantic' ? semanticData : data;
+  const currentIsLoading = searchMode === 'semantic' ? isSemanticLoading : isLoading;
+  const currentIsError = searchMode === 'semantic' ? isSemanticError : isError;
+  const currentError = searchMode === 'semantic' ? semanticError : error;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,6 +171,43 @@ export function SearchPage() {
             <p className="text-gray-500">Search across all CX digital assets</p>
           </div>
 
+          {/* Search Mode Tabs */}
+          <div className="flex justify-center mb-4">
+            <div className="inline-flex rounded-lg border border-gray-300 bg-white p-1 shadow-sm">
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchMode('name');
+                  setPage(1);
+                }}
+                className={`px-6 py-2 rounded-md text-sm font-medium transition-colors ${
+                  searchMode === 'name'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                📝 Name Search
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchMode('semantic');
+                  setPage(1);
+                  setWorkspace('');
+                  setFileType('');
+                  setTags('');
+                }}
+                className={`px-6 py-2 rounded-md text-sm font-medium transition-colors ${
+                  searchMode === 'semantic'
+                    ? 'bg-purple-600 text-white'
+                    : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                🔍 AI Semantic Search
+              </button>
+            </div>
+          </div>
+
           {/* Search bar - fixed position when searching */}
           <div ref={searchRef} className="relative">
             <form onSubmit={handleSearch}>
@@ -178,7 +233,7 @@ export function SearchPage() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => {
                     setIsSearchInputFocused(true);
-                    if (debouncedQuery.trim() && data) {
+                    if (debouncedQuery.trim() && currentData) {
                       setShowDropdown(true);
                     }
                   }}
@@ -189,21 +244,22 @@ export function SearchPage() {
                       setShowDropdown(false);
                     }, 200);
                   }}
-                  placeholder="Search by asset name..."
+                  placeholder={searchMode === 'semantic' ? 'Describe what you\'re looking for...' : 'Search by asset name...'}
                   className="w-full pl-12 pr-24 py-4 text-lg border-2 border-gray-300 rounded-full focus:outline-none focus:border-blue-500 shadow-lg hover:shadow-xl transition-shadow"
                 />
                 <div className="absolute inset-y-0 right-2 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowFilters(!showFilters);
-                      setShowDropdown(false); // Close dropdown when opening filters
-                    }}
-                    className={`p-2 rounded-full hover:bg-gray-100 transition-colors relative ${
-                      activeFiltersCount > 0 ? 'text-blue-600' : 'text-gray-500'
-                    }`}
-                    title="Filters"
-                  >
+                  {searchMode === 'name' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowFilters(!showFilters);
+                        setShowDropdown(false); // Close dropdown when opening filters
+                      }}
+                      className={`p-2 rounded-full hover:bg-gray-100 transition-colors relative ${
+                        activeFiltersCount > 0 ? 'text-blue-600' : 'text-gray-500'
+                      }`}
+                      title="Filters"
+                    >
                     <svg
                       className="h-6 w-6"
                       fill="none"
@@ -223,9 +279,12 @@ export function SearchPage() {
                       </span>
                     )}
                   </button>
+                  )}
                   <button
                     type="submit"
-                    className="px-6 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
+                    className={`px-6 py-2 text-white rounded-full hover:bg-opacity-90 transition-colors ${
+                      searchMode === 'semantic' ? 'bg-purple-600' : 'bg-blue-600'
+                    }`}
                   >
                     Search
                   </button>
@@ -234,17 +293,17 @@ export function SearchPage() {
             </form>
 
             {/* Dropdown results - only show when input is focused */}
-            {showDropdown && isSearchInputFocused && shouldFetch && (
+            {showDropdown && isSearchInputFocused && (shouldFetch || shouldFetchSemantic) && (
               <div className="absolute z-10 w-full mt-2 bg-white rounded-lg shadow-2xl border border-gray-200 max-h-96 overflow-y-auto">
-                {isLoading ? (
+                {currentIsLoading ? (
                   <div className="p-4 text-center text-gray-500">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
                   </div>
-                ) : data?.data.length === 0 ? (
+                ) : currentData?.data.length === 0 ? (
                   <div className="p-4 text-center text-gray-500">No assets found</div>
                 ) : (
                   <div>
-                    {data?.data.slice(0, 8).map((asset) => (
+                    {currentData?.data.slice(0, 8).map((asset) => (
                       <button
                         key={asset.id}
                         onClick={() => {
@@ -279,9 +338,9 @@ export function SearchPage() {
                         </div>
                       </button>
                     ))}
-                    {data && data.data.length > 8 && (
+                    {currentData && currentData.data.length > 8 && (
                       <div className="p-3 text-center text-sm text-blue-600 font-medium">
-                        Press Search to see all {data.pagination.total} results
+                        Press Search to see all {currentData.pagination.total} results
                       </div>
                     )}
                   </div>
@@ -290,7 +349,8 @@ export function SearchPage() {
             )}
           </div>
 
-          {/* Filters panel - expands below with smooth animation */}
+          {/* Filters panel - expands below with smooth animation (only for name search) */}
+          {searchMode === 'name' && (
           <div
             className={`transition-all duration-300 ease-in-out ${
               showFilters ? 'opacity-100 mt-4' : 'max-h-0 opacity-0'
@@ -427,13 +487,14 @@ export function SearchPage() {
               </div>
             </div>
           </div>
+          )}
         </div>
       </div>
 
       {/* Results grid - show when not focused on search input or explicitly searched */}
       {hasSearched && (!isSearchInputFocused || !showDropdown) && (
         <div className="flex-1 overflow-y-auto w-full">
-          {!shouldFetch ? (
+          {!shouldFetch && !shouldFetchSemantic ? (
             <div className="bg-blue-50 border border-blue-200 rounded-lg shadow-md p-12 text-center">
               <svg
                 className="h-16 w-16 text-blue-400 mx-auto mb-4"
@@ -453,12 +514,12 @@ export function SearchPage() {
                 Please enter a search query or select a workspace to view assets
               </p>
             </div>
-          ) : isLoading ? (
+          ) : currentIsLoading ? (
             <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="mt-4 text-gray-600">Searching...</p>
+              <div className={`animate-spin rounded-full h-12 w-12 border-b-2 mx-auto ${searchMode === 'semantic' ? 'border-purple-600' : 'border-blue-600'}`}></div>
+              <p className="mt-4 text-gray-600">{searchMode === 'semantic' ? 'Analyzing with AI...' : 'Searching...'}</p>
             </div>
-          ) : isError ? (
+          ) : currentIsError ? (
             <div className="bg-red-50 border border-red-200 rounded-lg shadow-md p-12 text-center">
               <svg
                 className="h-16 w-16 text-red-400 mx-auto mb-4"
@@ -475,7 +536,7 @@ export function SearchPage() {
               </svg>
               <p className="text-red-800 text-lg font-medium mb-2">Error loading assets</p>
               <p className="text-red-600 text-sm">
-                {error instanceof Error ? error.message : 'An unexpected error occurred. Please try again later.'}
+                {currentError instanceof Error ? currentError.message : 'An unexpected error occurred. Please try again later.'}
               </p>
               <button
                 onClick={() => window.location.reload()}
@@ -484,7 +545,7 @@ export function SearchPage() {
                 Refresh Page
               </button>
             </div>
-          ) : !data || data.data.length === 0 ? (
+          ) : !currentData || currentData.data.length === 0 ? (
             <div className="bg-white rounded-lg shadow-md p-12 text-center">
               <svg
                 className="h-16 w-16 text-gray-400 mx-auto mb-4"
@@ -519,12 +580,12 @@ export function SearchPage() {
                 )}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {data?.data.map((asset) => (
+                {currentData?.data.map((asset) => (
                   <AssetCard key={asset.id} asset={asset} onOpenDetail={setSelectedAsset} onEdit={setAssetToEdit} />
                 ))}
               </div>
 
-              {data && data.pagination.totalPages > 1 && (
+              {currentData && currentData.pagination.totalPages > 1 && (
                 <div className="flex justify-center items-center gap-3 mt-8 mb-8 px-4">
                   <button
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -537,11 +598,11 @@ export function SearchPage() {
                     Previous
                   </button>
                   <span className="px-4 py-2 text-sm text-gray-700 font-medium bg-gray-50 rounded-md border border-gray-200">
-                    Page {page} of {data.pagination.totalPages}
+                    Page {page} of {currentData.pagination.totalPages}
                   </span>
                   <button
                     onClick={() => setPage((p) => p + 1)}
-                    disabled={page === data.pagination.totalPages}
+                    disabled={page === currentData.pagination.totalPages}
                     className="px-4 py-2 bg-white border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors flex items-center gap-2 font-medium text-sm text-gray-700"
                   >
                     Next
